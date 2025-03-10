@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soccer AI - 5v5 Three.js Soccer Game</title>
+    <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-container">
+            <div id="scoreboard">
+                <div id="team-you"><span id="team-you-name">YOU</span>: <span id="score-you">0</span></div>
+                <div id="game-time">00:00</div>
+                <div id="team-ai"><span id="team-ai-name">AI</span>: <span id="score-ai">0</span></div>
+            </div>
+        </div>
+        <div id="game-overlay">
+            <div id="main-menu">
+                <h1>SOCCER AI</h1>
+                <div class="menu-options">
+                    <div class="team-selection">
+                        <div class="team-selector">
+                            <h3>Your Team</h3>
+                            <select id="player-team">
+                                <option value="Real Madrid">Real Madrid</option>
+                                <option value="Liverpool">Liverpool</option>
+                                <option value="Bayern Munchen">Bayern Munchen</option>
+                                <option value="Barcelona">Barcelona</option>
+                                <option value="Manchester City">Manchester City</option>
+                                <option value="Manchester United">Manchester United</option>
+                            </select>
+                            <div id="player-team-color" class="team-color-preview"></div>
+                        </div>
+                        <div class="team-selector">
+                            <h3>AI Team</h3>
+                            <select id="ai-team">
+                                <option value="Barcelona">Barcelona</option>
+                                <option value="Real Madrid">Real Madrid</option>
+                                <option value="Liverpool">Liverpool</option>
+                                <option value="Bayern Munchen">Bayern Munchen</option>
+                                <option value="Manchester City">Manchester City</option>
+                                <option value="Manchester United">Manchester United</option>
+                            </select>
+                            <div id="ai-team-color" class="team-color-preview"></div>
+                        </div>
+                    </div>
+                    <div class="difficulty-selector">
+                        <span>Difficulty:</span>
+                        <select id="difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="speed-selector">
+                        <span>Game Speed:</span>
+                        <input type="range" id="game-speed" min="0.5" max="1.5" step="0.1" value="1.0">
+                        <span id="speed-value">1.0x</span>
+                    </div>
+                    <button id="start-game">Start Game</button>
+                    <div class="controls-info">
+                        <h3>Controls</h3>
+                        <ul>
+                            <li>Movement: WASD or Arrow Keys</li>
+                            <li>Sprint: Shift</li>
+                            <li>Pass: Spacebar</li>
+                            <li>Shoot: X or Left Mouse Click (always shoots toward goal)</li>
+                            <li>Switch Player: Q</li>
+                            <li>Pause: ESC</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div id="pause-menu" class="hidden">
+                <h2>Game Paused</h2>
+                <button id="resume-game">Resume</button>
+                <button id="restart-game">Restart</button>
+                <button id="quit-game">Quit</button>
+            </div>
+            <div id="game-over" class="hidden">
+                <h2>Game Over</h2>
+                <div id="final-score"></div>
+                <button id="play-again">Play Again</button>
+                <button id="return-menu">Main Menu</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script src="./js/main.js" type="module"></script>
+</body>
+</html> 
