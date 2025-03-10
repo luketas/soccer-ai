@@ -63,7 +63,7 @@ Tested and working on:
 
 ## Credits
 
-Developed by [Your Name] using Three.js
+Developed by Lucas Franco using Three.js
 
 ## License
 
