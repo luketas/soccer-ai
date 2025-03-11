@@ -707,7 +707,9 @@ class SoccerGame {
             
             // Only process movement if there's input
             if (inputDirection.length() > 0) {
-                // Convert Vector2 to Vector3 for 3D movement (y in 2D maps to z in 3D)
+                // Convert Vector2 to Vector3 for 3D movement
+                // For touch controls, Y is already in the correct orientation (not inverted)
+                // where positive Y should move "down" in the field (increasing Z)
                 const moveDirection = new THREE.Vector3(inputDirection.x, 0, inputDirection.y);
                 
                 // Determine appropriate speed - always use sprint speed for human players

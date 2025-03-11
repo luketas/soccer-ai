@@ -165,10 +165,10 @@ export class InputManager {
             }
             
             // Update action states based on joystick direction
-            // Note: Y is inverted for screen coordinates
             if (distance > this.touchJoystickThreshold) {
-                // Invert y direction since screen coordinates are top-to-bottom
-                this.actionStates.movement.set(direction.x, -direction.y);
+                // Fix the inverted joystick by using the correct direction
+                // Don't negate the y-direction anymore
+                this.actionStates.movement.set(direction.x, direction.y);
                 
                 // Always use sprint on mobile for better experience
                 this.actionStates.sprint = true;
