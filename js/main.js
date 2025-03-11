@@ -43,13 +43,6 @@ class SoccerGame {
         
         // Start render loop
         this.animate();
-        
-        // Auto-start the game after a short delay (new code)
-        setTimeout(() => {
-            console.log("Auto-starting game...");
-            this.startGame();
-            console.log("Game active:", this.isGameActive);
-        }, 500);
     }
     
     initializeScene() {
@@ -319,6 +312,46 @@ class SoccerGame {
         canvas.addEventListener('mouseleave', () => {
             this.isMouseDown = false;
         });
+        
+        // Add touch event listeners for mobile
+        if (this.inputManager.isMobileDevice()) {
+            // For handling virtual joystick and action buttons
+            document.addEventListener('touchstart', (event) => {
+                if (!this.isGameActive) return;
+                
+                // Prevent default to avoid unwanted scrolling/zooming
+                event.preventDefault();
+                this.inputManager.onTouchStart(event);
+            }, { passive: false });
+            
+            document.addEventListener('touchmove', (event) => {
+                if (!this.isGameActive) return;
+                
+                // Prevent default to avoid unwanted scrolling/zooming
+                event.preventDefault();
+                this.inputManager.onTouchMove(event);
+            }, { passive: false });
+            
+            document.addEventListener('touchend', (event) => {
+                if (!this.isGameActive) return;
+                this.inputManager.onTouchEnd(event);
+            });
+            
+            document.addEventListener('touchcancel', (event) => {
+                if (!this.isGameActive) return;
+                this.inputManager.onTouchEnd(event);
+            });
+            
+            // Add touch control for pause
+            const pauseButton = document.getElementById('touch-pause-btn');
+            if (pauseButton) {
+                pauseButton.addEventListener('touchstart', (event) => {
+                    if (!this.isGameActive) return;
+                    event.preventDefault();
+                    this.pauseGame();
+                }, { passive: false });
+            }
+        }
     }
     
     startGame() {
@@ -335,7 +368,7 @@ class SoccerGame {
         
         // Update UI
         this.uiManager.updateScore(this.scoreYou, this.scoreAI);
-        this.uiManager.updateTime(this.gameTime);
+        this.uiManager.updateGameTime(this.gameTime);
         this.uiManager.hideMainMenu();
         
         // Update team names
@@ -444,8 +477,12 @@ class SoccerGame {
     
     endGame() {
         this.isGameActive = false;
-        this.uiManager.showGameOver(this.scoreYou, this.scoreAI);
+     
+        // Play game over sound
         this.soundManager.playGameOverSound();
+        
+        // Show game over screen with final scores
+        this.uiManager.showGameOver(this.scoreYou, this.scoreAI);
     }
     
     update(deltaTime) {
@@ -453,7 +490,7 @@ class SoccerGame {
         
         // Update game time
         this.gameTime += deltaTime;
-        this.uiManager.updateTime(Math.min(this.gameTime, this.maxGameTime));
+        this.uiManager.updateGameTime(Math.min(this.gameTime, this.maxGameTime));
         
         // Check if game time is up
         if (this.gameTime >= this.maxGameTime) {
@@ -938,7 +975,7 @@ class SoccerGame {
         
         // Find the closest opponent with the ball
         let closestOpponent = null;
-        let minDistance = 6; // Increased max tackle distance for better usability
+        let minDistance = 7; // Increased max tackle distance for better usability (was 6)
         
         this.players.ai.forEach(opponent => {
             if (opponent.isControllingBall || opponent.hasBall) {
@@ -949,6 +986,38 @@ class SoccerGame {
                 }
             }
         });
+        
+        // Also try to tackle ball when it's not controlled by anyone
+        if (!closestOpponent && !this.ball.isControlled) {
+            // Check if the ball is within tackle range
+            const ballDistance = this.activePlayer.mesh.position.distanceTo(this.ball.mesh.position);
+            if (ballDistance < 5) { // Extended range for free ball tackles
+                // Try to gain control of the free ball
+                if (this.ball.velocity.length() < 15) { // Only if ball is not moving too fast
+                    if (Math.random() < 0.7) { // 70% chance to gain control
+                        // Set ball position slightly ahead of player
+                        const controlOffset = this.activePlayer.direction.clone().multiplyScalar(1.2);
+                        this.ball.mesh.position.copy(this.activePlayer.mesh.position).add(controlOffset);
+                        this.ball.mesh.position.y = 0.5; // Ball radius
+                        
+                        // Give ball to player
+                        this.ball.isControlled = true;
+                        this.ball.controllingPlayer = this.activePlayer;
+                        this.activePlayer.startControllingBall(this.ball);
+                        
+                        console.log("Gained control of free ball with tackle!");
+                        this.soundManager.playKickSound();
+                        return;
+                    } else {
+                        // Failed to control, but still apply some force to the ball
+                        const tackleDirection = this.activePlayer.direction.clone().normalize();
+                        this.ball.velocity.copy(tackleDirection).multiplyScalar(8);
+                        this.ball.velocity.y = 1 + Math.random();
+                        return;
+                    }
+                }
+            }
+        }
         
         // If there's a nearby opponent with the ball
         if (closestOpponent) {
@@ -967,36 +1036,28 @@ class SoccerGame {
             this.activePlayer.constrainPositionToField(this.activePlayer.mesh.position);
             
             // Determine success chance based on role and distance
-            let successChance = 0.75; // Increased base chance from 0.7
+            let successChance = 0.8; // Increased from 0.75
             
-            // Defenders are better at tackling
+            // Role-based adjustments
             if (this.activePlayer.role === 'defender') {
-                successChance += 0.2;
+                successChance += 0.15; // Defenders are good at tackling
             } else if (this.activePlayer.role === 'midfielder') {
-                successChance += 0.05; // Small bonus for midfielders
-            } else if (this.activePlayer.role === 'attacker') {
-                successChance -= 0.1;
+                successChance += 0.05; // Midfielders are decent
             }
             
-            // Closer tackles are more likely to succeed - improved curve
-            // Use an exponential falloff that heavily favors close tackles
-            const distanceFactor = Math.exp(-minDistance / 3); // Exponential falloff
-            successChance *= 0.3 + 0.7 * distanceFactor; // Blend with base chance
+            // Distance-based adjustment
+            const distanceFactor = 1.0 - (minDistance / 8); // Linear falloff
+            successChance *= distanceFactor;
             
-            // Opponent's ball control skill reduces tackle success
-            const opponentSkillImpact = closestOpponent.ballControlStrength * 0.25; // Reduced from 0.3
-            successChance *= (1 - opponentSkillImpact);
+            // Opponent's role affects success
+            if (closestOpponent.role === 'attacker') {
+                successChance *= 0.9; // Attackers are harder to tackle
+            }
             
-            // Add a small random factor
-            successChance += (Math.random() * 0.1 - 0.05);
-            
-            // Ensure chance is within reasonable bounds - increased minimum chance
-            successChance = Math.min(0.95, Math.max(0.3, successChance));
-            
-            console.log(`Tackle chance: ${(successChance * 100).toFixed(1)}%`);
-            
-            // Track tackle position to detect if we're close enough after the lunge
+            // Record the tackler's position at the time of tackle attempt
             const tackleStartPosition = this.activePlayer.mesh.position.clone();
+            
+            // Record opponent's position at time of tackle attempt
             const opponentPosition = closestOpponent.mesh.position.clone();
             
             // Determine if tackle is successful
@@ -1027,12 +1088,12 @@ class SoccerGame {
                 
                 // Distance-based power adjustment - close tackles give player more control
                 let kickPower = 5;
-                if (minDistance < 2) {
+                if (minDistance < 3) { // Increased from 2 for more control opportunities
                     // Very close tackles - player gets more control
                     kickPower = 3;
                     
-                    // Small chance to gain control for very close, successful tackles
-                    if (Math.random() < 0.5) {
+                    // Better chance to gain control for very close, successful tackles
+                    if (Math.random() < 0.7) { // Increased from 0.5 (70% chance)
                         // Set ball position slightly ahead of player for cleaner animation
                         const controlOffset = this.activePlayer.direction.clone().multiplyScalar(1.2);
                         this.ball.mesh.position.copy(this.activePlayer.mesh.position).add(controlOffset);
@@ -1065,84 +1126,22 @@ class SoccerGame {
                 // Apply field boundaries to ensure ball stays in play
                 this.ball.handleFieldBoundaries(this.ball.mesh.position);
                 
-                // Play successful tackle sound
-                this.soundManager.playKickSound();
-                console.log("Successful tackle: Ball deflected away from opponent");
-            } else {
-                // Failed tackle - add momentum to opponent to create separation
-                const pushDirection = tackleDirection.clone();
-                const pushForce = 3 + Math.random() * 2;
-                
-                // Push the opponent slightly, less if they're skilled
-                const opponentResistance = closestOpponent.ballControlStrength * 0.7;
-                const effectivePush = pushForce * (1 - opponentResistance);
-                closestOpponent.velocity.add(pushDirection.multiplyScalar(effectivePush));
-                
-                // Failed tackles momentarily slow down the player - recovery time
-                this.activePlayer.velocity.multiplyScalar(0.5);
-                
-                console.log("Failed tackle attempt");
-                
-                // Play missed tackle sound if available
-                if (this.soundManager.hasMissSound) {
-                    this.soundManager.playMissSound();
-                }
-            }
-        } else {
-            // Check if the player is close to the free ball
-            const distanceToBall = this.activePlayer.mesh.position.distanceTo(this.ball.mesh.position);
-            if (distanceToBall < 3.5) { // Increased from 3.0 for better usability
-                console.log(`Attempting to kick free ball: distance=${distanceToBall.toFixed(2)}`);
-                
-                // Calculate kick direction - blend current direction and ball direction
-                // This makes kicking more intuitive and responsive
-                const playerFacingDirection = new THREE.Vector3(0, 0, 1)
-                    .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.activePlayer.mesh.rotation.y);
-                
-                const ballDirection = new THREE.Vector3()
-                    .subVectors(this.ball.mesh.position, this.activePlayer.mesh.position)
-                    .normalize();
-                
-                // Blend based on distance - closer means more influence from player direction
-                const blendFactor = Math.min(1.0, distanceToBall / 2);
-                const kickDirection = new THREE.Vector3()
-                    .addScaledVector(playerFacingDirection, 1 - blendFactor)
-                    .addScaledVector(ballDirection, blendFactor)
-                    .normalize();
-                
-                // Apply some slight randomization to the direction (for realism)
-                const randomAngle = (Math.random() - 0.5) * 0.1;
-                kickDirection.applyAxisAngle(new THREE.Vector3(0, 1, 0), randomAngle);
-                
-                // Calculate kick power based on distance
-                const kickPower = 20 + (distanceToBall * 2); // More power when further from ball
-                
-                // Apply force to ball 
-                this.ball.velocity.copy(kickDirection).multiplyScalar(kickPower);
-                
-                // Add vertical velocity for arc
-                this.ball.velocity.y = 3 + Math.random() * 3;
-                
-                // Lunge the player toward the ball for better animation - use sprint speed
-                this.activePlayer.velocity.copy(ballDirection).multiplyScalar(this.activePlayer.sprintSpeed * 1.2);
-                
-                // Apply field boundaries immediately to keep ball in play
-                this.ball.handleFieldBoundaries(this.ball.mesh.position);
-                
-                // Play sound
+                // Good tackling sound effect
                 this.soundManager.playKickSound();
                 
-                console.log(`Kicked free ball: power=${kickPower.toFixed(1)}, direction=(${kickDirection.x.toFixed(2)}, ${kickDirection.z.toFixed(2)})`);
+                console.log("Successful tackle!");
             } else {
-                // No nearby ball or opponent - lunge in player's facing direction
-                const lungeDirection = new THREE.Vector3(0, 0, 1)
-                    .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.activePlayer.mesh.rotation.y);
-                    
-                // Add a burst of speed for the lunging animation - use sprint speed
-                const lungeSpeed = this.activePlayer.sprintSpeed * 1.5;
-                this.activePlayer.velocity.copy(lungeDirection).multiplyScalar(lungeSpeed);
+                // Failed tackle animation and effects
                 
-                console.log("Lunging forward (no ball or opponent nearby)");
+                // Slow down player after failed tackle (recovery time)
+                this.activePlayer.velocity.multiplyScalar(0.3);
+                
+                // Tackled player gets a small boost to escape (for AI tactical advantage)
+                closestOpponent.velocity.add(
+                    tackleDirection.clone().multiplyScalar(-2) // Push in opposite direction of tackle
+                );
+                
+                console.log("Failed tackle!");
             }
         }
     }

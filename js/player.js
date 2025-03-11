@@ -286,10 +286,10 @@ export function createPlayer(team, role, color) {
             // If player is moving, place ball in front of player in movement direction
             if (this.velocity.length() > 0.1) {
                 // Improved speed factor calculation - more consistent at high speeds
-                const speedFactor = Math.min(1.3, 0.8 + (this.velocity.length() / this.speed) * 0.5); // Modified for better scaling
+                const speedFactor = Math.min(1.5, 0.9 + (this.velocity.length() / this.speed) * 0.6); // Modified for better scaling
                 
                 // Adjust base distance for better positioning at all speeds
-                const baseDistance = this.team === 'ai' ? 1.0 : 1.3; // Increased for better forward positioning
+                const baseDistance = this.team === 'ai' ? 1.0 : 1.2; // Slightly closer to player
                 const controlDistance = baseDistance * this.ballControlDistance * speedFactor;
                 
                 // Improved direction smoothing for more precise control
@@ -299,7 +299,7 @@ export function createPlayer(team, role, color) {
                     this.ballControlData.smoothedDirection.lerp(this.direction, smoothFactor);
                 } else {
                     // Better responsiveness for human player while maintaining stability
-                    const smoothFactor = 0.6; // Increased from 0.4 for even more responsive ball control
+                    const smoothFactor = 0.7; // Increased from 0.6 for even more responsive ball control
                     this.ballControlData.smoothedDirection.lerp(this.direction, smoothFactor);
                 }
                 
@@ -314,7 +314,7 @@ export function createPlayer(team, role, color) {
                 ballOffset.copy(this.ballControlData.smoothedDirection).multiplyScalar(controlDistance);
             } else {
                 // If player is stationary, place ball in front of player based on rotation
-                ballOffset.z = this.ballControlDistance * 0.8; // Increased from 0.7 to keep ball positioned better
+                ballOffset.z = this.ballControlDistance * 0.7; // Decreased from 0.8 to keep ball closer
                 ballOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y); // Rotate to match player orientation
                 
                 // Reset smoothed direction when stationary
@@ -333,8 +333,8 @@ export function createPlayer(team, role, color) {
             }
             
             // Smooth between last target and current target to reduce jerky movement
-            // This is especially important for AI players
-            const targetSmoothFactor = this.team === 'ai' ? 0.15 : 0.3;
+            // Human players get more responsive ball control
+            const targetSmoothFactor = this.team === 'ai' ? 0.15 : 0.45; // Increased from 0.3 for human players
             const smoothedTargetPos = new THREE.Vector3().copy(this.ballControlData.lastTargetPos)
                 .lerp(targetPos, targetSmoothFactor);
             
@@ -348,80 +348,46 @@ export function createPlayer(team, role, color) {
             // Calculate smoothed ball velocity to reach target position
             const ballToTarget = new THREE.Vector3().subVectors(smoothedTargetPos, ball.mesh.position);
             
-            // Calculate player movement speed as a percentage of max speed
-            const playerSpeedPercentage = this.velocity.length() / this.speed;
+            // Increase the ball attraction strength based on current conditions
+            let attractionStrength = 25; // Base attraction strength - increased from previous values
             
-            // Update oscillation phase with time - reduce frequency for more stable dribbling
-            this.ballControlData.oscillationPhase += deltaTime * (2.0 + playerSpeedPercentage * 1.5); // Reduced from 3.0 + 2.0
+            // Increase attraction when player changes direction abruptly
+            const directionChange = new THREE.Vector3().subVectors(
+                this.direction, this.ballControlData.smoothedDirection
+            ).length();
             
-            // Further reduce dribble jitter for more stability
-            const baseJitter = this.team === 'ai' ? 0.08 : 0.12; // Reduced from 0.1/0.15 for less random movement
-            const dribbleJitter = Math.max(0.08, playerSpeedPercentage) * baseJitter;
+            // Add more attraction when player is changing direction
+            attractionStrength += directionChange * 15;
             
-            // Vertical bounce - more subtle and consistent
-            const currentTime = Date.now() / 1000;
-            const timeSinceLastBounce = currentTime - this.ballControlData.lastBounceTime;
-            
-            // Longer bounce period for more stability
-            const bouncePeriod = 1.2 - playerSpeedPercentage * 0.3; // Adjusted for more consistency
-            
-            if (timeSinceLastBounce > bouncePeriod && ball.mesh.position.y <= 0.55) {
-                // Smaller, more consistent bounce
-                const bounceHeight = 0.3 + (Math.random() * 0.2) * playerSpeedPercentage; // Reduced for more control
-                // Higher skill impact for better players
-                const skillControl = 0.9 + (this.ballControlStrength * 0.3); // Increased skill impact
-                ball.velocity.y = bounceHeight * skillControl;
-                
-                // Record bounce time
-                this.ballControlData.lastBounceTime = currentTime;
+            // Add more attraction when ball is far from target
+            const ballTargetDistance = ballToTarget.length();
+            if (ballTargetDistance > 1.5) {
+                // Extra pull when ball is getting too far
+                attractionStrength += (ballTargetDistance - 1.5) * 20;
             }
             
-            // Minimal horizontal wobble for better control
-            const skillFactor = Math.max(0, 0.3 - this.ballControlStrength * 0.4); // Reduced for less wobble
-            const horizontalWobble = Math.sin(this.ballControlData.oscillationPhase) * dribbleJitter * 0.05 * skillFactor; // Reduced from 0.08
+            // Stronger attraction for human players (better control feel)
+            if (this.team !== 'ai') {
+                attractionStrength *= 1.2;
+            }
             
-            // Add very slight side-to-side wobble
-            ballToTarget.x += horizontalWobble;
-            ballToTarget.z += horizontalWobble * 0.2; // Reduced from 0.4 for even less z-axis influence
+            // Clamp attraction to avoid excessive forces
+            attractionStrength = Math.min(70, attractionStrength);
             
-            // The faster the player moves, the harder to control the ball
-            // Skill reduces this difficulty effect - make control much easier
-            const speedDifficulty = 1.0 + (playerSpeedPercentage * 0.4 * (1.0 - this.ballControlStrength)); // Reduced from 0.6 for easier control at speed
+            // Apply attraction force to move ball toward target
+            // Scale by deltaTime to make it framerate independent
+            const attractionForce = ballToTarget.multiplyScalar(attractionStrength * deltaTime);
             
-            // Significantly increase control force for much better responsiveness
-            const baseForce = this.team === 'ai' ? 32.0 : 30.0; // Increased from 28.0/24.0 for more responsive control
-            const skillBonus = this.ballControlStrength * 15.0; // Increased from 12.0 for better skill differentiation
-            const controlForce = baseForce + skillBonus; // Better players = more responsive ball
+            // Update ball velocity with calculated attraction
+            ball.velocity.add(attractionForce);
             
-            // Apply to ball velocity - smoother transition, not instant
-            ball.velocity.x = ballToTarget.x * controlForce / speedDifficulty;
-            ball.velocity.z = ballToTarget.z * controlForce / speedDifficulty;
+            // Dampen horizontal velocity to prevent excessive oscillation
+            ball.velocity.x *= 0.9;
+            ball.velocity.z *= 0.9;
             
-            // Drastically reduce chance of losing control while sprinting
-            const highSpeedThreshold = 0.95; // Increased from 0.9 
-            if (playerSpeedPercentage > highSpeedThreshold) {
-                // Only very occasionally lose control at high speed (skill-based)
-                const loseControlChance = Math.max(0, 0.0004 - (this.ballControlStrength * 0.0004)); // Reduced by 50% from previous values
-                
-                // Random check to see if player loses control
-                if (Math.random() < loseControlChance * deltaTime * 60) { // Scaled for consistent behavior at different framerates
-                    console.log(`${this.team} player ${this.role} lost control of ball at high speed`);
-                    
-                    // Add a small pop-up to the ball when control is lost
-                    // Reduced from 3.0 to 2.0 for less disruption
-                    ball.velocity.y = 1.5 + Math.random() * 0.5;
-                    
-                    // Apply random horizontal motion
-                    ball.velocity.x += (Math.random() - 0.5) * 2.0;
-                    ball.velocity.z += (Math.random() - 0.5) * 2.0;
-                    
-                    // Player loses ball control
-                    this.isControllingBall = false;
-                    this.hasBall = false;
-                    ball.controllingPlayer = null;
-                    
-                    return;
-                }
+            // Make sure the ball remains at reasonable height when controlled
+            if (ball.mesh.position.y > 0.6) {
+                ball.velocity.y -= 20 * deltaTime; // Enhanced gravity force to keep ball grounded
             }
         },
         

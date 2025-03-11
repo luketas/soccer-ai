@@ -212,8 +212,8 @@ export function createBall() {
             const ballPosition = this.mesh.position.clone();
             const ballVelocity = this.velocity.length();
             
-            // Player collision radius (slightly larger than actual size for better gameplay)
-            const playerRadius = 0.8;
+            // Player collision radius (significantly larger than actual size for better gameplay)
+            const playerRadius = 1.2; // Increased from 0.8 for easier ball control
             
             // Check collision with each player
             for (const player of allPlayers) {
@@ -237,12 +237,13 @@ export function createBall() {
                 const distance = ballPositionXZ.distanceTo(playerPosition);
                 
                 // Increase collision detection radius for ball control attempts
-                const controlRadius = ballRadius + playerRadius + 0.5; // Added extra distance
+                const controlRadius = ballRadius + playerRadius + 0.8; // Increased from 0.5
                 
                 // Check for collision or nearby proximity
                 if (distance < controlRadius) {
                     // Avoid collision delay (prevent multiple collisions in short time)
-                    if (this.lastPlayerContact === player && this.lastContactTime < 0.2) {
+                    // Reduced delay time for more responsive ball control
+                    if (this.lastPlayerContact === player && this.lastContactTime < 0.1) {
                         continue;
                     }
                     
@@ -268,22 +269,22 @@ export function createBall() {
                     // Check conditions for automatic ball control with more lenient criteria
                     
                     // Much higher threshold for "gentle" collision
-                    const isGentleCollision = relativeSpeed < 15; 
+                    const isGentleCollision = relativeSpeed < 20; // Increased from 15
                     
                     // Less strict requirement for moving toward ball
-                    const isMovingTowardBall = directionAlignment > -0.2; // Allow more side approaches
+                    const isMovingTowardBall = directionAlignment > -0.5; // Even more forgiving, was -0.2
                     
                     // Higher speed threshold for ball
-                    const isBallSlow = ballVelocity < 18; 
+                    const isBallSlow = ballVelocity < 25; // Increased from 18
                     
                     // Allow control for all player types (user team and AI team)
                     const canControlBall = true;
                     
                     // Significantly higher probability based on player's ball control skill
-                    const controlProbability = 0.5 + (player.ballControlStrength * 0.4);
+                    const controlProbability = 0.7 + (player.ballControlStrength * 0.3); // Increased base probability from 0.5
                     
                     // Special boost for user's active player (makes it easier for the player)
-                    const isActiveBoost = player.isActive ? 0.25 : 0;
+                    const isActiveBoost = player.isActive ? 0.3 : 0; // Increased from 0.25
                     
                     // Apply all criteria with more lenient conditions
                     if ((distance < controlRadius) && 
@@ -308,14 +309,30 @@ export function createBall() {
                     
                     // If the ball is very close to the player and moving slowly, give an extra chance
                     // This helps when the ball is rolling near the player
-                    if (distance < 1.5 && ballVelocity < 5 && player.isActive) {
-                        if (Math.random() < 0.5) { // 50% chance of control for nearby slow balls
+                    if (distance < 2.0 && ballVelocity < 8 && player.isActive) { // Increased distance from 1.5, speed from 5
+                        if (Math.random() < 0.8) { // Increased chance from 0.5 to 0.8 (80% chance)
                             this.isControlled = true;
                             this.controllingPlayer = player;
                             player.startControllingBall(this);
                             
                             // Apply minimal velocity to get the ball moving with player
                             const controlVelocity = player.direction.clone().normalize().multiplyScalar(2);
+                            this.velocity.copy(controlVelocity);
+                            this.velocity.y = 0;
+                            
+                            return;
+                        }
+                    }
+                    
+                    // Special case: Ball is on the ground and rolling slowly - make it easier to control
+                    if (this.mesh.position.y <= 0.51 && ballVelocity < 12 && player.isActive) {
+                        if (Math.random() < 0.6) { // 60% chance
+                            this.isControlled = true;
+                            this.controllingPlayer = player;
+                            player.startControllingBall(this);
+                            
+                            // Apply minimal velocity
+                            const controlVelocity = player.direction.clone().normalize().multiplyScalar(1.5);
                             this.velocity.copy(controlVelocity);
                             this.velocity.y = 0;
                             
@@ -341,31 +358,23 @@ export function createBall() {
                         .addScaledVector(playerDirection, playerInfluence)
                         .normalize();
                     
-                    // Apply force to ball
-                    this.velocity.copy(blendedDirection).multiplyScalar(baseForce);
+                    // Apply scaled force to ball
+                    this.velocity.add(blendedDirection.multiplyScalar(baseForce));
                     
-                    // Add some vertical velocity for a small bounce, proportional to collision force
-                    this.velocity.y = Math.max(2, baseForce * 0.2);
+                    // Add slight vertical velocity for a small bounce
+                    this.velocity.y += 1.0 + Math.random() * 2.0;
                     
-                    // Goalkeeper has special collision handling - stronger blocks
-                    if (player.role === 'goalkeeper') {
-                        const isGoalieReachingForBall = 
-                            (this.mesh.position.y < 5) && // Ball not too high
-                            (Math.abs(this.velocity.x) > 10); // Fast moving ball
-                            
-                        if (isGoalieReachingForBall) {
-                            // Stronger deflection for goalkeeper saves
-                            this.velocity.multiplyScalar(1.5);
-                        }
+                    // Apply ball spin when hit from side
+                    const sideAlignment = Math.abs(directionAlignment);
+                    if (sideAlignment < 0.5) {
+                        // Ball was hit from the side, add some spin
+                        const spinAxis = new THREE.Vector3(0, 1, 0);
+                        const spinMagnitude = baseForce * 0.2 * (1 - sideAlignment);
+                        
+                        // Determine spin direction based on hit side (cross product)
+                        const spinDirection = new THREE.Vector3().crossVectors(playerDirection, new THREE.Vector3(0, 1, 0));
+                        this.spin.addScaledVector(spinDirection, spinMagnitude);
                     }
-                    
-                    // Move the ball slightly to prevent sticking
-                    this.mesh.position.x += collisionVector.x * 0.2;
-                    this.mesh.position.z += collisionVector.z * 0.2;
-                    
-                    // We've handled a collision, so break the loop
-                    // (prevents multiple collisions in the same frame)
-                    break;
                 }
             }
             
@@ -374,7 +383,7 @@ export function createBall() {
                 const controlDistance = this.mesh.position.distanceTo(this.controllingPlayer.mesh.position);
                 
                 // Increase the maximum distance to make control more forgiving
-                const maxControlDistance = 3.0; // Increased from 2.5
+                const maxControlDistance = 3.5; // Increased from 3.0 for looser ball control
                 
                 // If ball gets too far from player, they lose control
                 if (controlDistance > maxControlDistance) {

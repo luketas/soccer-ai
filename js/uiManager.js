@@ -8,26 +8,26 @@ export class UIManager {
         this.onTeamSelect = onTeamSelect;
         this.onSpeedChange = onSpeedChange;
         
-        // UI elements
+        // Cache DOM elements
         this.elements = {
-            scoreYou: document.getElementById('score-you'),
-            scoreAI: document.getElementById('score-ai'),
-            teamYouName: document.getElementById('team-you-name'),
-            teamAIName: document.getElementById('team-ai-name'),
-            gameTime: document.getElementById('game-time'),
             mainMenu: document.getElementById('main-menu'),
             pauseMenu: document.getElementById('pause-menu'),
             gameOver: document.getElementById('game-over'),
+            scoreYou: document.getElementById('score-you'),
+            scoreAI: document.getElementById('score-ai'),
+            gameTime: document.getElementById('game-time'),
             finalScore: document.getElementById('final-score'),
             difficulty: document.getElementById('difficulty'),
             playerTeam: document.getElementById('player-team'),
             aiTeam: document.getElementById('ai-team'),
             playerTeamColor: document.getElementById('player-team-color'),
             aiTeamColor: document.getElementById('ai-team-color'),
-            gameOverlay: document.getElementById('game-overlay'),
             gameSpeed: document.getElementById('game-speed'),
             speedValue: document.getElementById('speed-value')
         };
+        
+        // Check if this is a mobile device
+        this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
         // Create notification container if it doesn't exist
         if (!document.getElementById('notification-container')) {
@@ -43,6 +43,7 @@ export class UIManager {
         
         // Initialize UI
         this.setupEventListeners();
+        this.initMobileControls();
     }
     
     setupEventListeners() {
@@ -101,150 +102,169 @@ export class UIManager {
         });
     }
     
-    updateScore(playerScore, aiScore) {
-        if (this.elements.scoreYou) {
-            this.elements.scoreYou.textContent = playerScore;
-        }
+    // Initialize mobile controls based on device detection
+    initMobileControls() {
+        const mobileControls = document.getElementById('mobile-controls');
         
-        if (this.elements.scoreAI) {
-            this.elements.scoreAI.textContent = aiScore;
-        }
-    }
-    
-    updateTeamNames(playerTeam, aiTeam) {
-        if (this.elements.teamYouName) {
-            this.elements.teamYouName.textContent = playerTeam;
-        }
-        
-        if (this.elements.teamAIName) {
-            this.elements.teamAIName.textContent = aiTeam;
-        }
-    }
-    
-    updateTeamColorPreview(team, teamName) {
-        const teamManager = window.teamManager; // Access from global scope
-        if (!teamManager) return;
-        
-        const teamData = teamManager.getTeamData(teamName);
-        const colorElement = team === 'player' ? 
-                             this.elements.playerTeamColor : 
-                             this.elements.aiTeamColor;
-        
-        if (colorElement && teamData) {
-            // Convert hex color to CSS
-            const hexColor = teamData.homeColor.toString(16).padStart(6, '0');
-            colorElement.style.backgroundColor = `#${hexColor}`;
-        }
-    }
-    
-    updateTime(seconds) {
-        if (this.elements.gameTime) {
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = Math.floor(seconds % 60);
+        // Force display mobile controls if on a touch device
+        if (this.isMobile) {
+            console.log("Mobile device detected, initializing touch controls");
             
-            // Format with leading zeros
-            const formattedMinutes = String(minutes).padStart(2, '0');
-            const formattedSeconds = String(remainingSeconds).padStart(2, '0');
+            // Force display mobile controls
+            if (mobileControls) {
+                mobileControls.style.display = 'block';
+                
+                // Make sure joystick elements are properly positioned but hidden initially
+                const joystickBase = document.getElementById('touch-joystick-base');
+                const joystickHandle = document.getElementById('touch-joystick-handle');
+                
+                if (joystickBase && joystickHandle) {
+                    joystickBase.style.display = 'none';
+                    joystickHandle.style.display = 'none';
+                }
+            }
             
-            this.elements.gameTime.textContent = `${formattedMinutes}:${formattedSeconds}`;
+            // Show mobile controls info
+            const mobileControlsInfo = document.querySelector('.mobile-controls-info');
+            if (mobileControlsInfo) {
+                mobileControlsInfo.style.display = 'block';
+            }
+            
+            // Add additional meta viewport settings for better mobile experience
+            const viewportMeta = document.querySelector('meta[name="viewport"]');
+            if (viewportMeta) {
+                viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            }
+            
+            // Add utility function for touch feedback
+            document.querySelectorAll('.touch-btn').forEach(button => {
+                button.addEventListener('touchstart', () => {
+                    button.classList.add('touch-btn-active');
+                });
+                
+                button.addEventListener('touchend', () => {
+                    button.classList.remove('touch-btn-active');
+                });
+            });
+        } else {
+            // Hide mobile controls on desktop
+            if (mobileControls) {
+                mobileControls.style.display = 'none';
+            }
         }
     }
     
+    // Update the team color preview
+    updateTeamColorPreview(teamType, teamName) {
+        const colorElement = teamType === 'player' ? this.elements.playerTeamColor : this.elements.aiTeamColor;
+        const teamColors = {
+            'Real Madrid': '#FFFFFF',
+            'Liverpool': '#C8102E',
+            'Bayern Munchen': '#DC052D',
+            'Barcelona': '#A50044',
+            'Manchester City': '#6CABDD',
+            'Manchester United': '#DA291C'
+        };
+        
+        colorElement.style.backgroundColor = teamColors[teamName] || '#FFFFFF';
+    }
+    
+    // Show the main menu
     showMainMenu() {
-        // Add dark overlay when showing menus
-        this.elements.gameOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-        
-        // Hide other menus
+        this.elements.mainMenu.classList.remove('hidden');
         this.elements.pauseMenu.classList.add('hidden');
         this.elements.gameOver.classList.add('hidden');
-        
-        // Show main menu
-        this.elements.mainMenu.classList.remove('hidden');
     }
     
+    // Hide the main menu
     hideMainMenu() {
         this.elements.mainMenu.classList.add('hidden');
-        // Remove dark overlay when game is active
-        this.elements.gameOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';
     }
     
+    // Show the pause menu
     showPauseMenu() {
-        // Add dark overlay when showing menus
-        this.elements.gameOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
         this.elements.pauseMenu.classList.remove('hidden');
     }
     
+    // Hide the pause menu
     hidePauseMenu() {
         this.elements.pauseMenu.classList.add('hidden');
-        // Remove dark overlay when game is active
-        this.elements.gameOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';
     }
     
-    showGameOver(playerScore, aiScore) {
-        // Add dark overlay when showing menus
-        this.elements.gameOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    // Show the game over screen
+    showGameOver(yourScore, aiScore) {
+        this.elements.gameOver.classList.remove('hidden');
+        const result = yourScore > aiScore ? 'You Win!' : (aiScore > yourScore ? 'AI Wins!' : 'It\'s a Draw!');
+        this.elements.finalScore.textContent = `${result} Final Score: ${yourScore} - ${aiScore}`;
+    }
+    
+    // Update the scoreboard
+    updateScore(yourScore, aiScore) {
+        this.elements.scoreYou.textContent = yourScore;
+        this.elements.scoreAI.textContent = aiScore;
+    }
+    
+    // Update team names in the UI
+    updateTeamNames(playerTeam, aiTeam) {
+        const teamYouName = document.getElementById('team-you-name');
+        const teamAIName = document.getElementById('team-ai-name');
         
-        // Set the final score text
-        let resultText = '';
-        
-        if (playerScore > aiScore) {
-            resultText = `You Win! ${playerScore}-${aiScore}`;
-        } else if (playerScore < aiScore) {
-            resultText = `You Lose! ${playerScore}-${aiScore}`;
-        } else {
-            resultText = `Draw! ${playerScore}-${aiScore}`;
+        if (teamYouName) {
+            teamYouName.textContent = playerTeam;
         }
         
-        this.elements.finalScore.textContent = resultText;
-        
-        // Show game over screen
-        this.elements.gameOver.classList.remove('hidden');
+        if (teamAIName) {
+            teamAIName.textContent = aiTeam;
+        }
     }
     
-    hideGameOver() {
-        this.elements.gameOver.classList.add('hidden');
-        // Remove dark overlay when game is active
-        this.elements.gameOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+    // Update the game time display
+    updateGameTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        this.elements.gameTime.textContent = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
     }
     
-    // Display a notification message that disappears after a timeout
-    showNotification(message, duration = 2000) {
-        const notificationContainer = document.getElementById('notification-container');
+    // Update the speed value display
+    updateSpeedValueDisplay(value) {
+        this.elements.speedValue.textContent = `${value.toFixed(1)}x`;
+    }
+    
+    // Show a notification message
+    showNotification(message, duration = 3000) {
+        const container = document.getElementById('notification-container');
+        if (!container) return;
         
-        // Create notification element
         const notification = document.createElement('div');
-        notification.className = 'game-notification';
+        notification.classList.add('notification');
         notification.textContent = message;
-        
-        // Style the notification
         notification.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
         notification.style.color = 'white';
         notification.style.padding = '10px 20px';
         notification.style.borderRadius = '5px';
         notification.style.marginBottom = '10px';
-        notification.style.transition = 'opacity 0.5s ease-out';
+        notification.style.transition = 'opacity 0.5s ease';
         notification.style.opacity = '0';
         
-        // Add to container
-        notificationContainer.appendChild(notification);
+        container.appendChild(notification);
         
-        // Trigger fade in
+        // Fade in
         setTimeout(() => {
             notification.style.opacity = '1';
         }, 10);
         
-        // Remove after duration
+        // Fade out and remove
         setTimeout(() => {
             notification.style.opacity = '0';
             setTimeout(() => {
-                notificationContainer.removeChild(notification);
+                notification.remove();
             }, 500);
         }, duration);
     }
     
     // Show goal announcement with animation
-    showGoalAnnouncement(playerScore, aiScore, callback) {
-        // Create goal announcement container if it doesn't exist
+    showGoalAnnouncement(yourScore, aiScore, callback) {
+        // Create or get goal announcement container
         let goalAnnouncement = document.getElementById('goal-announcement');
         if (!goalAnnouncement) {
             goalAnnouncement = document.createElement('div');
@@ -287,18 +307,35 @@ export class UIManager {
         goalText.style.fontWeight = 'bold';
         goalText.style.color = '#FFD700'; // Gold color
         goalText.style.marginBottom = '20px';
+        goalText.style.transition = 'transform 0.5s ease-in-out';
         goalAnnouncement.appendChild(goalText);
         
         // Get team names
-        const teamYouName = this.elements.teamYouName.textContent;
-        const teamAIName = this.elements.teamAIName.textContent;
+        const teamYouName = document.getElementById('team-you-name').textContent;
+        const teamAIName = document.getElementById('team-ai-name').textContent;
         
         // Create score text
         const scoreText = document.createElement('div');
-        scoreText.textContent = `${teamYouName} ${playerScore} - ${aiScore} ${teamAIName}`;
+        scoreText.textContent = `${teamYouName} ${yourScore} - ${aiScore} ${teamAIName}`;
         scoreText.style.fontSize = '40px';
         scoreText.style.fontWeight = 'bold';
         goalAnnouncement.appendChild(scoreText);
+        
+        // Make the announcement responsive
+        const updateSize = () => {
+            const windowWidth = window.innerWidth;
+            if (windowWidth < 600) {
+                goalText.style.fontSize = '50px';
+                scoreText.style.fontSize = '24px';
+            } else {
+                goalText.style.fontSize = '80px';
+                scoreText.style.fontSize = '40px';
+            }
+        };
+        
+        // Call once initially and add resize listener
+        updateSize();
+        window.addEventListener('resize', updateSize, { once: true });
         
         // Animate the announcement in
         setTimeout(() => {
@@ -307,7 +344,6 @@ export class UIManager {
             
             // Add some animation to the GOAL! text
             goalText.style.transform = 'scale(1.2)';
-            goalText.style.transition = 'transform 0.5s ease-in-out';
             
             setTimeout(() => {
                 goalText.style.transform = 'scale(1)';
@@ -323,17 +359,14 @@ export class UIManager {
                     if (document.body.contains(overlay)) {
                         document.body.removeChild(overlay);
                     }
+                    if (document.body.contains(goalAnnouncement)) {
+                        document.body.removeChild(goalAnnouncement);
+                    }
                     if (callback && typeof callback === 'function') {
                         callback();
                     }
                 }, 500);
             }, 3000);
         }, 10);
-    }
-    
-    updateSpeedValueDisplay(speed) {
-        if (this.elements.speedValue) {
-            this.elements.speedValue.textContent = `${speed.toFixed(1)}x`;
-        }
     }
 } 
