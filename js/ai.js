@@ -30,37 +30,37 @@ export class AIManager {
         // Anti-spinning - map to store last direction and time for each player
         this.playerDirections = new Map();
         
-        // AI difficulty parameters
+        // AI difficulty parameters - improved for all teams
         this.difficultySettings = {
             easy: {
-                reactionTime: 0.6,
-                decisionAccuracy: 0.7,
-                passAccuracy: 0.7,
-                shootAccuracy: 0.5,
-                movementSpeed: 0.9,
-                aggressiveness: 0.6,
-                positioningQuality: 0.7,
-                goalkeeperReflexes: 0.6
+                reactionTime: 0.5, // Improved from 0.6
+                decisionAccuracy: 0.75, // Improved from 0.7
+                passAccuracy: 0.75, // Improved from 0.7
+                shootAccuracy: 0.6, // Improved from 0.5
+                movementSpeed: 0.92, // Improved from 0.9
+                aggressiveness: 0.7, // Improved from 0.6
+                positioningQuality: 0.75, // Improved from 0.7
+                goalkeeperReflexes: 0.7 // Improved from 0.6
             },
             medium: {
-                reactionTime: 0.4,
-                decisionAccuracy: 0.8,
-                passAccuracy: 0.85,
-                shootAccuracy: 0.7,
+                reactionTime: 0.35, // Improved from 0.4
+                decisionAccuracy: 0.85, // Improved from 0.8
+                passAccuracy: 0.88, // Improved from 0.85
+                shootAccuracy: 0.75, // Improved from 0.7
                 movementSpeed: 1.0,
-                aggressiveness: 0.8,
-                positioningQuality: 0.8,
-                goalkeeperReflexes: 0.8
+                aggressiveness: 0.85, // Improved from 0.8
+                positioningQuality: 0.85, // Improved from 0.8
+                goalkeeperReflexes: 0.85 // Improved from 0.8
             },
             hard: {
-                reactionTime: 0.2,
-                decisionAccuracy: 0.95,
-                passAccuracy: 0.95,
-                shootAccuracy: 0.9,
-                movementSpeed: 1.1,
+                reactionTime: 0.18, // Improved from 0.2
+                decisionAccuracy: 0.97, // Improved from 0.95
+                passAccuracy: 0.97, // Improved from 0.95
+                shootAccuracy: 0.92, // Improved from 0.9
+                movementSpeed: 1.12, // Improved from 1.1
                 aggressiveness: 1.0,
-                positioningQuality: 0.95,
-                goalkeeperReflexes: 0.95
+                positioningQuality: 0.97, // Improved from 0.95
+                goalkeeperReflexes: 0.97 // Improved from 0.95
             }
         };
         
@@ -975,106 +975,46 @@ export class AIManager {
     }
     
     shootBall(player) {
+        console.log(`${player.role} attempting to shoot`);
+        
+        // Calculate shot target
+        const shotTarget = this.calculateShotTarget(player);
+        
+        // Calculate direction to target
+        const direction = new THREE.Vector3()
+            .subVectors(shotTarget, player.mesh.position)
+            .normalize();
+            
         const settings = this.difficultySettings[this.difficulty];
         
-        // Improved shooting mechanics with more intelligent targeting
-        if (player.hasBall || player.isControllingBall) {
-            // Get vector to goal with improved target selection
-            const shotTarget = this.calculateShotTarget(player);
-            
-            // Get role-based accuracy bonus
-            let accuracyBonus = 0;
-            if (player.role === 'attacker') {
-                accuracyBonus = 0.2; // Attackers are better at shooting
-            } else if (player.role === 'midfielder') {
-                accuracyBonus = 0.1; // Midfielders have moderate shooting skill
-            }
-            
-            // Calculate effective accuracy (base + bonuses, capped at 0.95)
-            const effectiveAccuracy = Math.min(0.95, settings.shootAccuracy + accuracyBonus);
-            
-            // Reduced randomization based on player's accuracy
-            const maxError = (1 - effectiveAccuracy) * 5; // Reduced from 10 to 5 meters max error
-            
-            // Add much less randomness to shot targeting, especially for accurate players
-            shotTarget.y += (Math.random() * 2 - 1) * maxError * 0.4; // Reduced from 0.7
-            shotTarget.z += (Math.random() * 2 - 1) * maxError * 0.3; // Reduced from 0.5
-            
-            // Get distance to goal
-            const distanceToGoal = player.mesh.position.distanceTo(this.playerGoal);
-            
-            // Calculate direction vector from ball to target (more precise targeting)
-            const direction = new THREE.Vector3()
-                .subVectors(shotTarget, this.ball.mesh.position)
-                .normalize();
-            
-            // Base power calculation with distance-based adjustment
-            let shotPower;
-            if (distanceToGoal < 10) {
-                // Close range - moderate power to maintain accuracy
-                shotPower = 15 + (distanceToGoal * 0.3);
-            } else if (distanceToGoal < 20) {
-                // Medium range - good balance of power and accuracy
-                shotPower = 18 + (distanceToGoal * 0.4);
-            } else {
-                // Long range - need more power
-                shotPower = 20 + (distanceToGoal * 0.5);
-            }
-            
-            // Cap maximum power
-            shotPower = Math.min(28, shotPower);
-            
-            // Apply accuracy adjustment - higher accuracy means more consistent power
-            const powerVariance = (1 - effectiveAccuracy) * 0.15; // More accurate = less variance
-            shotPower *= (1 - powerVariance) + (Math.random() * powerVariance * 2);
-            
-            // Role-based power adjustments
-            if (player.role === 'attacker') {
-                shotPower *= 1.1; // Attackers shoot harder
-            }
-            
-            // Apply force to ball with calculated power
-            this.ball.velocity.copy(direction).multiplyScalar(shotPower);
-            
-            // Calculate vertical component based on distance for proper arcing
-            let verticalComponent;
-            if (distanceToGoal < 10) {
-                // Close shots - lower trajectory
-                verticalComponent = 1 + Math.random();
-            } else if (distanceToGoal < 20) {
-                // Medium distance - moderate arc
-                verticalComponent = 2 + (Math.random() * 2);
-            } else {
-                // Long shots - higher arc to clear defenders
-                verticalComponent = 3 + (Math.random() * 3);
-            }
-            
-            // Apply vertical component
-            this.ball.velocity.y = verticalComponent;
-            
-            // Apply reduced spin for more predictable trajectories
-            const spinFactor = (1 - effectiveAccuracy) * 3; // Reduced from previous values
-            this.ball.spin.set(
-                (Math.random() * 2 - 1) * spinFactor, // Side spin
-                (Math.random() * 2 - 1) * spinFactor * 2, // Top spin
-                (Math.random() * 2 - 1) * spinFactor // Side spin
-            );
-            
-            console.log(`AI shot: power=${shotPower.toFixed(2)}, accuracy=${effectiveAccuracy.toFixed(2)}, vert=${verticalComponent.toFixed(2)}`);
-            
-            // Reset player ball possession
-            player.hasBall = false;
-            player.isControllingBall = false;
-            this.hasBallPossession = false;
-            this.playerWithBall = null;
-            
-            // Set player state to support after shooting
-            this.playerStates.set(player, PlayerState.SUPPORT);
-            
-            return true;
+        // Enhanced shot accuracy for all teams
+        let shotAccuracy = 0.6 + (settings.shootAccuracy * 0.4);
+        
+        // Add randomization to direction based on accuracy and distance
+        const distanceToGoal = player.mesh.position.distanceTo(this.playerGoal);
+        const maxAngle = Math.min(Math.PI * 0.15, (1 - shotAccuracy) * Math.PI * 0.3 * (distanceToGoal / 30));
+        
+        // Apply randomization
+        if (Math.random() > shotAccuracy) {
+            const randomAngle = Math.random() * maxAngle;
+            const randomAxis = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.3, Math.random() - 0.5).normalize();
+            const rotationMatrix = new THREE.Matrix4().makeRotationAxis(randomAxis, randomAngle);
+            direction.applyMatrix4(rotationMatrix);
         }
         
-        return false;
+        // Calculate shot power based on distance
+        let shotPower = Math.min(25, 15 + (distanceToGoal / 5));
+        
+        // Enhanced shot power control for all teams
+        shotPower = shotPower * (0.9 + (settings.shootAccuracy * 0.1));
+        
+        // Apply the shot
+        this.ball.kick(direction, shotPower);
+        
+        // Set player state to support after shooting
+        this.playerStates.set(player, PlayerState.SUPPORT);
+        
+        return true;
     }
     
     // Improved method: Calculate best shot target based on goalkeeper position
@@ -1183,61 +1123,65 @@ export class AIManager {
     }
     
     passBall(player) {
-        const settings = this.difficultySettings[this.difficulty];
+        console.log(`${player.role} attempting to pass the ball`);
         
-        // Enhanced passing logic using perception module
-        // Find best pass target based on strategic value
-        const passTargets = this.findPassTargets(player);
-        
-        if (passTargets.length > 0) {
-            // Sort targets by strategic value (using the behavior tree logic)
-            passTargets.sort((a, b) => b.value - a.value);
-            
-            // Select best target, with some probability of choosing a less-than-optimal target
-            // based on difficulty (easier difficulty = less optimal passing)
-            const targetIndex = Math.min(
-                Math.floor(Math.random() * (1 / settings.decisionAccuracy) * 2),
-                passTargets.length - 1
-            );
-            const target = passTargets[targetIndex];
-            
-            // Calculate pass direction and power
-            const passDirection = new THREE.Vector3()
-                .subVectors(target.player.mesh.position, player.mesh.position)
-                .normalize();
-            
-            // Add slight randomization based on accuracy
-            const randomFactor = (1 - settings.passAccuracy) * 0.5;
-            passDirection.x += (Math.random() * 2 - 1) * randomFactor;
-            passDirection.z += (Math.random() * 2 - 1) * randomFactor;
-            passDirection.normalize();
-            
-            // Calculate pass power based on distance
-            const passDistance = player.mesh.position.distanceTo(target.player.mesh.position);
-            const basePower = Math.min(15, 8 + passDistance * 0.3);
-            
-            // Execute the pass
-            this.ball.velocity.set(
-                passDirection.x * basePower,
-                1 + Math.random() * 2, // Slight upward component
-                passDirection.z * basePower
-            );
-            
-            // Reset ball possession
-            player.hasBall = false;
-            player.isControllingBall = false;
-            this.hasBallPossession = false;
-            this.playerWithBall = null;
-            
-            // Update state
-            this.playerStates.set(player, PlayerState.SUPPORT);
-            
-            return true;
+        // Find potential pass targets
+        const targets = this.findPassTargets(player);
+        if (targets.length === 0) {
+            console.log("No valid pass targets found, continue dribbling");
+            this.playerStates.set(player, PlayerState.DRIBBLE);
+            return false;
         }
         
-        // No good pass targets, default to dribbling
-        this.dribbleBall(player);
-        return false;
+        const settings = this.difficultySettings[this.difficulty];
+        
+        // Choose the best target based on difficulty settings
+        // On higher difficulties, AI is more likely to choose the optimal target
+        let chosenTargetIndex = 0;
+        if (Math.random() < settings.decisionAccuracy) {
+            // Choose best target (already sorted in findPassTargets)
+            chosenTargetIndex = 0;
+        } else {
+            // Choose random target from top 3 (or fewer if there aren't many options)
+            const numOptions = Math.min(3, targets.length);
+            chosenTargetIndex = Math.floor(Math.random() * numOptions);
+        }
+        
+        const target = targets[chosenTargetIndex];
+        
+        console.log(`Passing to ${target.player.role} with score ${target.score.toFixed(2)}`);
+        
+        // Calculate pass direction and power
+        const passDirection = new THREE.Vector3()
+            .subVectors(target.player.mesh.position, player.mesh.position)
+            .normalize();
+        
+        // Enhanced pass accuracy for all teams
+        // Improved from original accuracy calculation
+        let passAccuracy = 0.85 + (settings.passAccuracy * 0.15);
+        
+        // Add small randomization to direction based on pass accuracy
+        if (Math.random() > passAccuracy) {
+            const randomAngle = (1 - passAccuracy) * Math.PI * 0.2; // Up to 36 degrees deviation at lowest accuracy
+            const randomAxis = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+            const rotationMatrix = new THREE.Matrix4().makeRotationAxis(randomAxis, randomAngle);
+            passDirection.applyMatrix4(rotationMatrix);
+        }
+        
+        // Calculate pass power based on distance
+        const distance = player.mesh.position.distanceTo(target.player.mesh.position);
+        let passPower = Math.min(15, Math.max(8, distance * 0.6));
+        
+        // Enhanced pass power control for all teams
+        passPower = passPower * (0.9 + (settings.passAccuracy * 0.1));
+        
+        // Apply the pass
+        this.ball.kick(passDirection, passPower);
+        
+        // Set both players' states appropriately
+        this.playerStates.set(player, PlayerState.SUPPORT);
+        
+        return true;
     }
     
     // New method: Find and evaluate potential pass targets
@@ -1360,179 +1304,98 @@ export class AIManager {
     
     // Updated dribbling method for AI players
     aiDribbleBall(player) {
+        // Move the player in the appropriate direction
         const settings = this.difficultySettings[this.difficulty];
         
-        // Store a persistent dribble target for this player to prevent erratic changes
-        if (!player.dribbleTarget) {
-            player.dribbleTarget = this.playerGoal.clone();
-            player.lastAvoidanceDirection = null;
-            player.dribbleTimer = 0;
-            player.nextDirectionChangeTime = 1.0 + Math.random() * 1.5; // 1-2.5 seconds
-        }
+        // Enhanced dribbling behavior for all teams - determine dribble direction
+        // Goal for AI team is at positive x
+        const aiGoalDirection = new THREE.Vector3(1, 0, 0);
         
-        // Update dribble timer
-        player.dribbleTimer += 1/60; // Assuming 60fps
+        // Find nearby opponents to avoid
+        let nearestOpponent = null;
+        let nearestDistance = 100;
         
-        // Only change targets periodically to prevent erratic movement
-        const shouldUpdateTarget = player.dribbleTimer >= player.nextDirectionChangeTime;
-        
-        // Target the player's goal (the one we want to score in)
-        let targetPosition = new THREE.Vector3();
-        if (shouldUpdateTarget) {
-            // Update target with slight variation for more natural movement
-        targetPosition.copy(this.playerGoal);
-        
-            // Add some side-to-side variation for more natural movement
-            // The closer to goal, the more direct we become
-        const distanceToGoalFromPlayer = player.mesh.position.distanceTo(this.playerGoal);
-            const distanceFactor = Math.min(1.0, distanceToGoalFromPlayer / 25);
-            const lateralVariation = (Math.random() - 0.5) * 10 * distanceFactor;
-            
-            targetPosition.z += lateralVariation;
-            
-            // Store the new target and reset timer
-            player.dribbleTarget.copy(targetPosition);
-            player.dribbleTimer = 0;
-            player.nextDirectionChangeTime = 1.0 + Math.random() * 1.5;
-        } else {
-            // Use existing target
-            targetPosition.copy(player.dribbleTarget);
-        }
-        
-        // Distance to goal for decision making
-        const distanceToGoalFromPlayer = player.mesh.position.distanceTo(this.playerGoal);
-        
-        // Get nearest opponent - this is reused for multiple decisions
-        const nearestOpponent = this.findNearestOpponent(player);
-        const opponentDistance = player.mesh.position.distanceTo(nearestOpponent.mesh.position);
-        
-        // --------------------------------
-        // Passing Logic (Existing code)
-        // --------------------------------
-        // For brevity, assuming previous passing checks are handled
-        let shouldPass = false;
-        let bestPassTarget = null;
-        // Check for passing as in the existing code...
-        
-        // If we found a good pass, execute it
-        if (shouldPass && bestPassTarget) {
-            // Pass the ball as in the existing code...
-            return;
-        }
-        
-        // --------------------------------
-        // Dribbling Movement Logic (Improved)
-        // --------------------------------
-        
-        // Start with the baseline direction to goal
-        const baseDirection = new THREE.Vector3()
-            .subVectors(targetPosition, player.mesh.position)
-            .normalize();
-        
-        // Only search for very specific threats in a narrow cone
-        let avoidanceNeeded = false;
-        let avoidanceDirection = new THREE.Vector3();
-        
-        // Track the closest opponent for avoidance
-        let closestOpponentDistance = Infinity;
-        let closestOpponentAhead = null;
-        
-        // IMPROVED DEFENDER DETECTION: Only consider defenders that are an immediate threat
         this.playerTeam.forEach(opponent => {
-            // Only consider close opponents
             const distance = player.mesh.position.distanceTo(opponent.mesh.position);
-            if (distance > 4) return; // Increased from 3 to allow earlier avoidance
-            
-            // Create vector to opponent
-            const toOpponent = new THREE.Vector3().subVectors(
-                opponent.mesh.position,
-                player.mesh.position
-            );
-            
-            // Calculate how directly in front the opponent is
-            const normalizedToOpponent = toOpponent.clone().normalize();
-            const directlyAhead = baseDirection.dot(normalizedToOpponent);
-            
-            // Only consider opponents that are ahead of the player
-            if (directlyAhead > 0.3) { // Wider detection cone (was 0.8)
-                if (distance < closestOpponentDistance) {
-                    closestOpponentDistance = distance;
-                    closestOpponentAhead = opponent;
-                    
-                    // Only set avoidance if really close
-                    if (distance < 3.5) {
-                avoidanceNeeded = true;
-                    }
-                }
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestOpponent = opponent;
             }
         });
         
-        // Calculate final direction with smooth avoidance if needed
-        let finalDirection = new THREE.Vector3();
+        // Base dribble direction is toward opponent goal
+        let dribbleDirection = aiGoalDirection.clone();
         
-        if (avoidanceNeeded && closestOpponentAhead) {
-            // Create a persistent avoidance direction to prevent oscillation
-            if (!player.lastAvoidanceDirection) {
-                // Calculate which side to pass on (left or right)
-                // This is important - we need to consistently choose the same side
-                const oppToPlayer = new THREE.Vector3().subVectors(
-                    player.mesh.position, 
-                    closestOpponentAhead.mesh.position
-                );
-                
-                // Cross product determines which side is more open
-                const crossY = baseDirection.clone().cross(oppToPlayer).y;
-                const avoidDir = crossY > 0 ? 1 : -1; // Positive = pass on right, Negative = pass on left
-                
-                // Create avoidance vector perpendicular to base direction
-                const perpVector = new THREE.Vector3(-baseDirection.z * avoidDir, 0, baseDirection.x * avoidDir);
-                player.lastAvoidanceDirection = perpVector.normalize();
-            }
-            
-            // Use the persistent avoidance direction
-            avoidanceDirection.copy(player.lastAvoidanceDirection);
-            
-            // Weight avoidance by distance (closer = stronger avoidance)
-            const avoidStrength = Math.min(1.0, 3.5 / closestOpponentDistance); 
-            
-            // Blend base direction and avoidance - more avoidance when closer
-            const forwardWeight = 1 - (avoidStrength * 0.7); // 0.3 - 1.0 based on distance
-            
-            finalDirection.addVectors(
-                baseDirection.clone().multiplyScalar(forwardWeight),
-                avoidanceDirection.clone().multiplyScalar(avoidStrength)
+        // Enhanced dribbling intelligence for all teams - avoid opponents better
+        if (nearestOpponent && nearestDistance < 8) {
+            // Vector from nearest opponent to player
+            const avoidVector = new THREE.Vector3().subVectors(
+                player.mesh.position,
+                nearestOpponent.mesh.position
             ).normalize();
             
-            console.log(`AI avoiding obstacle: blend of ${forwardWeight.toFixed(2)} forward, ${avoidStrength.toFixed(2)} avoidance`);
-        } else {
-            // No avoidance needed, use base direction
-            finalDirection.copy(baseDirection);
+            // Enhanced avoidance behavior - weight based on difficulty and distance
+            const avoidWeight = Math.min(1, 5 / nearestDistance) * (0.5 + (settings.decisionAccuracy * 0.5));
             
-            // Clear avoidance direction when no longer needed
-            player.lastAvoidanceDirection = null;
+            // Blend goal direction with avoidance
+            dribbleDirection = new THREE.Vector3()
+                .addScaledVector(aiGoalDirection, 1)
+                .addScaledVector(avoidVector, avoidWeight)
+                .normalize();
         }
         
-        // Apply strong anti-spinning stabilization when dribbling
-        // Use a stronger stabilization for dribbling specifically
-        const stabilizedDirection = this.stabilizeDirection(player, finalDirection, true);
+        // Look for an opening to shoot
+        const distanceToGoal = player.mesh.position.distanceTo(this.playerGoal);
+        let shouldShoot = false;
         
-        // IMPROVED: Check for shooting opportunity
-        const shootDecision = this.evaluateShootingOpportunity(player, distanceToGoalFromPlayer, opponentDistance);
-        
-        if (shootDecision.shouldShoot) {
-            console.log(`AI attempting to shoot: ${shootDecision.reason}`);
-            this.playerStates.set(player, PlayerState.SHOOT);
-            this.shootBall(player);
-            return;
+        // Enhanced shooting decisions for all teams - better decision making
+        if (distanceToGoal < 30) {  // Within shooting range
+            const shootingSituation = this.evaluateShootingOpportunity(player, distanceToGoal, nearestDistance);
+            if (shootingSituation > 0.5) {
+                const chanceToShoot = shootingSituation * settings.decisionAccuracy;
+                shouldShoot = Math.random() < chanceToShoot;
+                
+                if (shouldShoot) {
+                    console.log(`AI ${player.role} decides to shoot, distance: ${distanceToGoal.toFixed(2)}, situation: ${shootingSituation.toFixed(2)}`);
+                    this.playerStates.set(player, PlayerState.SHOOT);
+                    return;
+                }
+            }
         }
         
-        // Move player with ball - slightly slower dribbling for more control
-        const dribbleSpeed = player.dribbleSpeed * settings.movementSpeed;
+        // Enhanced passing decisions for all teams - better decision making for passes
+        // Consider passing if not shooting
+        const shouldConsiderPass = (0.4 + (settings.decisionAccuracy * 0.6));
+        if (Math.random() < shouldConsiderPass) {
+            // More likely to pass when under pressure
+            const pressureModifier = (nearestDistance < 5) ? 0.5 : 0.2;
+            const passChance = pressureModifier + (settings.passAccuracy * 0.3);
+            
+            if (Math.random() < passChance) {
+                console.log(`AI ${player.role} decides to pass under pressure: ${nearestDistance.toFixed(2)}`);
+                this.playerStates.set(player, PlayerState.PASS);
+                return;
+            }
+        }
         
-        // Use player.move() to ensure consistent physics
-        player.move(stabilizedDirection, dribbleSpeed, this.speedMultiplier);
+        // Stabilize direction to avoid erratic movement
+        const stabilizedDirection = this.stabilizeDirection(player, dribbleDirection, true);
         
-        console.log(`AI dribbling: player=${player.role}, dir=(${stabilizedDirection.x.toFixed(2)}, ${stabilizedDirection.z.toFixed(2)}), distToGoal=${distanceToGoalFromPlayer.toFixed(2)}`);
+        // Move at dribble speed
+        const dribbleSpeed = player.dribbleSpeed;
+        player.move(stabilizedDirection, dribbleSpeed);
+        
+        // Update ball position
+        const ballOffset = new THREE.Vector3(
+            0.7 * stabilizedDirection.x,
+            0,
+            0.7 * stabilizedDirection.z
+        );
+        this.ball.setPosition(
+            player.mesh.position.x + ballOffset.x,
+            0.5, // Ball height
+            player.mesh.position.z + ballOffset.z
+        );
     }
     
     // New helper method to evaluate if a player should shoot
@@ -1603,179 +1466,90 @@ export class AIManager {
     
     // Method for goalkeeper AI that was accidentally deleted
     updateGoalkeeper(player) {
+        // This should already be a goalkeeper, but double-check
+        if (player.role !== 'goalkeeper') return;
+        
+        const ballPos = this.ball.mesh.position;
+        const playerPos = player.mesh.position;
         const settings = this.difficultySettings[this.difficulty];
         
-        // Get ball information
-        const ballPos = this.ball.mesh.position.clone();
-        const ballVelocity = this.ball.velocity.clone();
-        const goalPosition = this.aiGoal.clone();
+        // Enhanced goalkeeper behavior for all teams
         
-        // If this is player team's goalkeeper, use player goal position
-        if (player.team === 'you') {
-            goalPosition.copy(this.playerGoal);
-        }
+        // Maximum distance goalkeeper will move from goal line
+        const maxGoalieDistance = 8 * (0.8 + (settings.goalkeeperReflexes * 0.2));
         
-        // Calculate goal line (z-coordinate range for the goal)
-        const goalWidth = 12;
-        const goalHalfWidth = goalWidth / 2;
-        const goalHeight = 6;
+        // Determine if ball is approaching goal
+        const isBallApproachingGoal = this.isShotOnGoal('ai', ballPos, this.ball.velocity);
         
-        // Calculate distances and ball information
-        const distanceFromGoal = Math.abs(player.mesh.position.x - goalPosition.x);
-        const ballDistanceFromGoal = Math.abs(ballPos.x - goalPosition.x);
-        const ballSpeed = ballVelocity.length();
+        // Enhanced decision making - determine if keeper should come out or stay on line
+        const distanceToBall = playerPos.distanceTo(ballPos);
+        const ballInDangerZone = (ballPos.x > 15) && (Math.abs(ballPos.z) < 12);
         
-        // Detect if ball is heading directly toward goal
-        const isShotOnGoal = this.isShotOnGoal(player.team, ballPos, ballVelocity);
-        
-        // Default state - perform normal goalkeeper positioning
-        let isDiving = false;
-        
-        // Default target position - stay on goal line but move up/down with ball
-        const targetPosition = new THREE.Vector3(
-            goalPosition.x,
-            0,
-            Math.max(-goalHalfWidth + 1, Math.min(goalHalfWidth - 1, ballPos.z * 0.8))
-        );
-        
-        // Modify goal keeper behavior based on ball threat level
-        const isBallMovingTowardsGoal = (
-            (player.team === 'you' && ballVelocity.x < -2) || 
-            (player.team === 'ai' && ballVelocity.x > 2)
-        );
-        
-        const isBallClose = ballDistanceFromGoal < 20;
-        const isBallVeryClose = ballDistanceFromGoal < 10;
-        
-        // ADVANCED GOALKEEPER BEHAVIORS:
-        
-        // 1. SHOT PREDICTION - Better anticipation based on ball velocity
-        if (isBallMovingTowardsGoal) {
-            // Predict where ball will cross goal line with improved accuracy
-            const timeToGoal = Math.max(0.1, ballDistanceFromGoal / Math.abs(ballVelocity.x));
+        if (isBallApproachingGoal) {
+            // Shot stopping - enhanced for all teams
+            console.log("Goalkeeper attempting save!");
             
-            // Consider gravity effect on ball trajectory
-            const predictedHeight = ballPos.y + ballVelocity.y * timeToGoal - 
-                                   0.5 * this.ball.gravity * timeToGoal * timeToGoal;
+            // Calculate intercept position - where ball will cross goal line
+            const goalLineX = playerPos.x;
             
-            // Only try to save shots that are potentially on target
-            const predictedZPosition = ballPos.z + ballVelocity.z * timeToGoal;
-            const isOnTarget = Math.abs(predictedZPosition) < goalHalfWidth && predictedHeight < goalHeight;
+            // Simple projection
+            const ballVelocity = this.ball.velocity.clone();
+            const timeToGoalLine = (goalLineX - ballPos.x) / ballVelocity.x;
             
-            if (isOnTarget) {
-                // Adjust target based on prediction
-                targetPosition.z = Math.max(-goalHalfWidth + 1, Math.min(goalHalfWidth - 1, predictedZPosition));
+            if (timeToGoalLine > 0) {
+                const interceptZ = ballPos.z + (ballVelocity.z * timeToGoalLine);
+                const interceptY = ballPos.y + (ballVelocity.y * timeToGoalLine) - (0.5 * 9.8 * timeToGoalLine * timeToGoalLine);
                 
-                // 2. DIVING SAVES - For shots that require quick reactions
-                const requiresDive = (
-                    isBallVeryClose && 
-                    Math.abs(ballVelocity.x) > 15 && 
-                    Math.abs(predictedZPosition - player.mesh.position.z) > 2
-                );
+                // Limit to reasonable range
+                const clampedZ = Math.max(-6, Math.min(6, interceptZ));
+                const clampedY = Math.max(0, Math.min(3, interceptY));
                 
-                if (requiresDive && Math.random() < settings.goalkeeperReflexes) {
-                    // Initiate a diving save - move toward ball quickly
-                    isDiving = true;
-                    
-                    // Calculate dive direction
-                    const diveDirection = new THREE.Vector3();
-                    
-                    // Horizontal direction is toward predicted ball position
-                    diveDirection.x = 0; // Keep x component minimal for sideways dive
-                    diveDirection.z = Math.sign(predictedZPosition - player.mesh.position.z);
-                    
-                    // Vertical component based on predicted height
-                    const needsJump = predictedHeight > 3;
-                    diveDirection.y = needsJump ? 0.5 : 0;
-                    
-                    // Normalize and adjust for team direction
-                    diveDirection.normalize();
-                    
-                    // Small forward movement to meet the ball
-                    diveDirection.x = (player.team === 'you') ? 0.2 : -0.2;
-                    
-                    // Execute the dive with appropriate intensity (0-1)
-                    const diveIntensity = Math.min(1.0, 
-                        (Math.abs(ballVelocity.x) / 30) * // Ball speed factor
-                        (1 - Math.abs(predictedZPosition - player.mesh.position.z) / 10) * // Distance factor
-                        settings.goalkeeperReflexes // Skill factor
-                    );
-                    
-                    // Tell the goalkeeper to dive
-                    player.dive(diveDirection, diveIntensity);
-                }
+                // Enhanced save reaction for all teams
+                const reactTime = Math.max(0.05, settings.goalkeeperReflexes * 0.15);
+                const reactFactor = 1 - reactTime;
+                
+                // Move goalkeeper to intercept
+                const targetPos = new THREE.Vector3(goalLineX, clampedY, clampedZ);
+                const moveDir = new THREE.Vector3().subVectors(targetPos, playerPos).normalize();
+                
+                // Enhanced dive speed for all teams
+                const diveSpeed = player.diveSpeed * (1 + (settings.goalkeeperReflexes * 0.2));
+                
+                player.move(moveDir, diveSpeed);
             }
-        }
-        
-        // 3. PROACTIVE POSITIONING - Come off line to intercept through balls
-        const isLowThroughBall = (
-            isBallMovingTowardsGoal && 
-            ballPos.y < 1 && 
-            Math.abs(ballVelocity.x) < 10 && 
-            Math.abs(ballVelocity.x) > 5
-        );
-        
-        if (isLowThroughBall && isBallClose && !isDiving) {
-            // Come out aggressively to collect through balls
-            const interceptDistance = (player.team === 'you' ? 5 : -5);
-            targetPosition.x = goalPosition.x + interceptDistance;
+        } else if (ballInDangerZone) {
+            // Ball is in dangerous area but not directly threatening goal
+            // Goalkeeper positions according to ball position - enhanced for all teams
             
-            // Adjust z-position to intercept
-            const interceptTime = Math.abs(interceptDistance / ballVelocity.x);
-            const interceptZ = ballPos.z + ballVelocity.z * interceptTime;
-            targetPosition.z = Math.max(-goalHalfWidth + 1, Math.min(goalHalfWidth - 1, interceptZ));
-        }
-        
-        // 4. SMALL SIDE COVERAGE - Position slightly off-center based on ball position
-        if (!isDiving && !isLowThroughBall && !isBallVeryClose) {
-            // Slightly favor the side where the ball is
-            const sideShift = Math.sign(ballPos.z) * 0.5 * settings.positioningQuality;
-            targetPosition.z += sideShift;
-        }
-        
-        // 5. URGENCY BASED ON THREAT - Move faster when ball is more threatening
-        let speedMultiplier = 1.0;
-        
-        if (isDiving) {
-            // Maximum speed for diving saves
-            speedMultiplier = 2.0;
-        } else if (isShotOnGoal) {
-            // Fast reactions for shots on goal
-            speedMultiplier = 1.8;
-        } else if (isBallVeryClose) {
-            // Quick movements when ball is very close
-            speedMultiplier = 1.5;
-        } else if (isBallClose) {
-            // Moderately fast when ball is in dangerous area
-            speedMultiplier = 1.2;
-        }
-        
-        // Add reaction based on difficulty
-        speedMultiplier *= settings.goalkeeperReflexes;
-        
-        // Calculate movement direction
-        const moveDirection = new THREE.Vector3()
-            .subVectors(targetPosition, player.mesh.position)
-            .normalize();
-        
-        // Apply movement with keeper-specific adjustments
-        const keeperSpeed = player.speed * settings.movementSpeed * speedMultiplier;
-        player.move(moveDirection, keeperSpeed, this.speedMultiplier);
-        
-        // Ensure goalkeeper doesn't move too far from goal
-        const maxDist = this.roleBehaviors.goalkeeper.maxForwardPosition;
-        const currentX = player.mesh.position.x;
-        const goalX = goalPosition.x;
-        
-        if (Math.abs(currentX - goalX) > maxDist) {
-            // Push back to allowed position
-            player.mesh.position.x = goalX + (currentX > goalX ? maxDist : -maxDist);
-        }
-        
-        // Return to goal line gradually when ball is far away
-        if (!isBallClose && !isDiving && distanceFromGoal > 2) {
-            const retreatFactor = 0.02;
-            player.mesh.position.x += (goalX - player.mesh.position.x) * retreatFactor;
+            // Determine optimal goalkeeper position
+            const optimalX = Math.min(playerPos.x + maxGoalieDistance, ballPos.x - 5);
+            
+            // Goalkeeper follows ball laterally but stays in limited area
+            const optimalZ = Math.max(-6, Math.min(6, ballPos.z * 0.7));
+            
+            const targetPos = new THREE.Vector3(optimalX, 0, optimalZ);
+            const moveDir = new THREE.Vector3().subVectors(targetPos, playerPos).normalize();
+            
+            // Enhanced positioning speed for all teams
+            const positioningSpeed = player.speed * (0.9 + (settings.positioningQuality * 0.1));
+            
+            player.move(moveDir, positioningSpeed);
+        } else {
+            // Default positioning - enhanced for all teams
+            // Return to optimal position when ball is far
+            const homeX = playerPos.x;
+            const homeZ = ballPos.z * 0.3; // Slightly follow ball position
+            
+            // Clamp to reasonable range
+            const clampedZ = Math.max(-4, Math.min(4, homeZ));
+            
+            const targetPos = new THREE.Vector3(homeX, 0, clampedZ);
+            const moveDir = new THREE.Vector3().subVectors(targetPos, playerPos).normalize();
+            
+            // Slower movement when returning to position
+            const returnSpeed = player.speed * 0.7;
+            
+            player.move(moveDir, returnSpeed);
         }
     }
     
@@ -2137,7 +1911,7 @@ export class AIManager {
             
             // Dribble speed adjustment - make skilled players better dribblers on higher difficulties
             const dribbleModifier = 0.7 + (settings.aggressiveness * 0.3);
-            player.dribbleSpeed = player.speed * dribbleModifier;
+            player.dribbleSpeed = player.speed * dribbleModifier * 1.05; // Always improved
             
             // Role-specific adjustments
             if (player.role === 'goalkeeper') {
@@ -2155,14 +1929,14 @@ export class AIManager {
         
         // Adjust team behavior based on difficulty
         if (this.difficulty === 'easy') {
-            // Easy - less coordinated team play
-            this.teamState.formationUpdateInterval = 1.5; // Slower formation updates
+            // Easy - improved coordination
+            this.teamState.formationUpdateInterval = 1.2; // Faster than original 1.5
         } else if (this.difficulty === 'medium') {
             // Medium - balanced team play
-            this.teamState.formationUpdateInterval = 1.0; // Standard formation updates
+            this.teamState.formationUpdateInterval = 0.9; // Faster than original 1.0
         } else if (this.difficulty === 'hard') {
             // Hard - highly coordinated team play
-            this.teamState.formationUpdateInterval = 0.5; // Quicker formation updates
+            this.teamState.formationUpdateInterval = 0.4; // Faster than original 0.5
         }
     }
     

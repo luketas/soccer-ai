@@ -314,7 +314,16 @@ class SoccerGame {
         });
         
         // Add touch event listeners for mobile
-        if (this.inputManager.isMobileDevice()) {
+        console.log("Setting up touch controls - Device has touch:", 'ontouchstart' in window || navigator.maxTouchPoints > 0);
+        
+        // Check if this is likely a mobile device
+        const isMobileDevice = 'ontouchstart' in window || 
+                               navigator.maxTouchPoints > 0 || 
+                               window.innerWidth <= 1024;
+                               
+        if (isMobileDevice) {
+            console.log("Mobile device detected, initializing touch controls");
+            
             // For handling virtual joystick and action buttons
             document.addEventListener('touchstart', (event) => {
                 if (!this.isGameActive) return;
@@ -322,6 +331,7 @@ class SoccerGame {
                 // Prevent default to avoid unwanted scrolling/zooming
                 event.preventDefault();
                 this.inputManager.onTouchStart(event);
+                console.log("Touch start detected");
             }, { passive: false });
             
             document.addEventListener('touchmove', (event) => {
@@ -335,6 +345,7 @@ class SoccerGame {
             document.addEventListener('touchend', (event) => {
                 if (!this.isGameActive) return;
                 this.inputManager.onTouchEnd(event);
+                console.log("Touch end detected");
             });
             
             document.addEventListener('touchcancel', (event) => {
@@ -342,14 +353,46 @@ class SoccerGame {
                 this.inputManager.onTouchEnd(event);
             });
             
-            // Add touch control for pause
-            const pauseButton = document.getElementById('touch-pause-btn');
-            if (pauseButton) {
-                pauseButton.addEventListener('touchstart', (event) => {
-                    if (!this.isGameActive) return;
-                    event.preventDefault();
-                    this.pauseGame();
-                }, { passive: false });
+            // Set up direct touch control handlers for the buttons
+            const setupTouchButton = (buttonId, action) => {
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.addEventListener('touchstart', (event) => {
+                        if (!this.isGameActive) return;
+                        event.preventDefault();
+                        console.log(`${buttonId} pressed`);
+                        
+                        switch(action) {
+                            case 'pass':
+                                this.passBall();
+                                break;
+                            case 'shoot':
+                                this.shootTowardGoal();
+                                break;
+                            case 'switch':
+                                this.switchToNextPlayer();
+                                break;
+                            case 'pause':
+                                this.pauseGame();
+                                break;
+                        }
+                    }, { passive: false });
+                } else {
+                    console.warn(`Button ${buttonId} not found`);
+                }
+            };
+            
+            // Set up each action button
+            setupTouchButton('touch-pass-btn', 'pass');
+            setupTouchButton('touch-shoot-btn', 'shoot');
+            setupTouchButton('touch-switch-btn', 'switch');
+            setupTouchButton('touch-pause-btn', 'pause');
+            
+            // Ensure mobile controls are visible
+            const mobileControls = document.getElementById('mobile-controls');
+            if (mobileControls) {
+                mobileControls.style.display = 'block';
+                console.log("Mobile controls container displayed via event listener setup");
             }
         }
     }
@@ -390,6 +433,157 @@ class SoccerGame {
             this.setGameSpeed(parseFloat(gameSpeedSlider.value));
             this.uiManager.updateSpeedValueDisplay(this.speedMultiplier);
         }
+        
+        // Show mobile controls if on a mobile device
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 1024) {
+            console.log("Mobile device detected, activating controls when game starts");
+            const mobileControls = document.getElementById('mobile-controls');
+            if (mobileControls) {
+                // Force display the mobile controls
+                mobileControls.style.display = 'flex';
+                mobileControls.style.zIndex = '9999';
+                mobileControls.style.visibility = 'visible';
+                mobileControls.style.pointerEvents = 'auto';
+                
+                // Use setAttribute with !important to override any other styles
+                mobileControls.setAttribute('style', 
+                    'display: flex !important; ' + 
+                    'z-index: 9999 !important; ' + 
+                    'pointer-events: auto !important; ' +
+                    'visibility: visible !important;'
+                );
+                
+                console.log("Mobile controls activated and forced visible at game start");
+                
+                // Setup mobile control positions right after forcing display
+                setTimeout(() => this.setupMobileControlPositions(), 100);
+            } else {
+                console.error("Mobile controls container not found!");
+            }
+        }
+    }
+    
+    // Position mobile controls correctly
+    setupMobileControlPositions() {
+        console.log("Setting up mobile control positions");
+        const joystickArea = document.getElementById('touch-joystick-area');
+        const actionButtons = document.getElementById('touch-action-buttons');
+        const pauseButton = document.getElementById('touch-pause-btn');
+        
+        if (joystickArea) {
+            joystickArea.style.position = 'fixed';
+            joystickArea.style.bottom = '100px';
+            joystickArea.style.left = '30px';
+            joystickArea.style.display = 'block';
+            joystickArea.style.visibility = 'visible';
+            joystickArea.style.zIndex = '10000';
+            joystickArea.style.pointerEvents = 'auto';
+            
+            console.log("Joystick area positioned:", 
+                        "display:", joystickArea.style.display,
+                        "visibility:", joystickArea.style.visibility,
+                        "position:", joystickArea.getBoundingClientRect());
+            
+            // Initialize joystick position
+            const joystickBase = document.getElementById('touch-joystick-base');
+            const joystickHandle = document.getElementById('touch-joystick-handle');
+            
+            if (joystickBase && joystickHandle) {
+                const rect = joystickArea.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                joystickBase.style.display = 'block';
+                joystickBase.style.visibility = 'visible';
+                joystickBase.style.left = `${centerX}px`;
+                joystickBase.style.top = `${centerY}px`;
+                joystickBase.style.zIndex = '10001';
+                
+                joystickHandle.style.display = 'block';
+                joystickHandle.style.visibility = 'visible';
+                joystickHandle.style.left = `${centerX}px`;
+                joystickHandle.style.top = `${centerY}px`;
+                joystickHandle.style.zIndex = '10002';
+                
+                console.log("Joystick elements positioned");
+            }
+        }
+        
+        if (actionButtons) {
+            actionButtons.style.position = 'fixed';
+            actionButtons.style.bottom = '120px';
+            actionButtons.style.right = '30px';
+            actionButtons.style.display = 'flex';
+            actionButtons.style.visibility = 'visible';
+            actionButtons.style.zIndex = '10000';
+            actionButtons.style.pointerEvents = 'auto';
+            
+            // Make all buttons visible
+            const buttons = actionButtons.querySelectorAll('.touch-btn');
+            buttons.forEach(btn => {
+                btn.style.display = 'flex';
+                btn.style.visibility = 'visible';
+                btn.style.zIndex = '10001';
+                console.log(`Button ${btn.id} made visible`);
+            });
+        }
+        
+        if (pauseButton) {
+            pauseButton.style.position = 'fixed';
+            pauseButton.style.top = '20px';
+            pauseButton.style.right = '20px';
+            pauseButton.style.display = 'flex';
+            pauseButton.style.visibility = 'visible';
+            pauseButton.style.zIndex = '10001';
+        }
+        
+        // Adjust for smaller screens
+        this.adjustControlsForScreenSize();
+    }
+    
+    // Adjust controls based on screen size
+    adjustControlsForScreenSize() {
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        const joystickArea = document.getElementById('touch-joystick-area');
+        const actionButtons = document.getElementById('touch-action-buttons');
+        
+        if (screenWidth < 375) {
+            // Extra small screens (iPhone SE, etc.)
+            if (joystickArea) {
+                joystickArea.style.bottom = '70px';
+                joystickArea.style.left = '20px';
+                joystickArea.style.width = '100px';
+                joystickArea.style.height = '100px';
+            }
+            
+            if (actionButtons) {
+                actionButtons.style.bottom = '90px';
+                actionButtons.style.right = '15px';
+                actionButtons.style.gap = '20px';
+                
+                // Make buttons smaller
+                const buttons = actionButtons.querySelectorAll('.touch-btn');
+                buttons.forEach(btn => {
+                    btn.style.width = '60px';
+                    btn.style.height = '60px';
+                    btn.style.fontSize = '12px';
+                });
+            }
+        } else if (screenWidth < 768) {
+            // Small to medium screens (most phones)
+            if (joystickArea) {
+                joystickArea.style.bottom = '90px';
+                joystickArea.style.left = '25px';
+            }
+            
+            if (actionButtons) {
+                actionButtons.style.bottom = '110px';
+                actionButtons.style.right = '25px';
+            }
+        }
+        
+        console.log(`Controls adjusted for screen size: ${screenWidth}x${screenHeight}`);
     }
     
     pauseGame() {

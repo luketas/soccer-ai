@@ -106,22 +106,134 @@ export class UIManager {
     initMobileControls() {
         const mobileControls = document.getElementById('mobile-controls');
         
-        // Force display mobile controls if on a touch device
+        // Force display mobile controls if on a touch device or small screen
+        console.log("Checking for mobile device...");
+        this.isMobile = 'ontouchstart' in window || 
+                       navigator.maxTouchPoints > 0 || 
+                       window.innerWidth <= 1024;
+        
+        console.log("Device is mobile:", this.isMobile, 
+                    "ontouchstart:", 'ontouchstart' in window, 
+                    "maxTouchPoints:", navigator.maxTouchPoints, 
+                    "screen width:", window.innerWidth);
+        
         if (this.isMobile) {
-            console.log("Mobile device detected, initializing touch controls");
+            console.log("Mobile device detected! Initializing touch controls");
             
             // Force display mobile controls
             if (mobileControls) {
-                mobileControls.style.display = 'block';
+                // Set important display properties to ensure visibility
+                mobileControls.style.display = 'flex';
+                mobileControls.style.zIndex = '9999';
+                mobileControls.style.pointerEvents = 'auto';
+                mobileControls.style.visibility = 'visible';
                 
-                // Make sure joystick elements are properly positioned but hidden initially
+                // Add !important to styles for extra certainty
+                mobileControls.setAttribute('style', 
+                    'display: flex !important; ' + 
+                    'z-index: 9999 !important; ' + 
+                    'pointer-events: auto !important; ' +
+                    'visibility: visible !important;'
+                );
+                
+                console.log("Mobile controls container displayed with important styles");
+                
+                // Make sure joystick elements are properly positioned and visible
                 const joystickBase = document.getElementById('touch-joystick-base');
                 const joystickHandle = document.getElementById('touch-joystick-handle');
+                const joystickArea = document.getElementById('touch-joystick-area');
                 
-                if (joystickBase && joystickHandle) {
-                    joystickBase.style.display = 'none';
-                    joystickHandle.style.display = 'none';
+                if (joystickArea) {
+                    // Position joystick based on screen size
+                    const screenWidth = window.innerWidth;
+                    joystickArea.style.display = 'block';
+                    joystickArea.style.visibility = 'visible';
+                    joystickArea.style.zIndex = '10000';
+                    joystickArea.style.pointerEvents = 'auto';
+                    
+                    if (screenWidth < 375) {
+                        // For very small screens
+                        joystickArea.style.bottom = '70px';
+                        joystickArea.style.left = '20px';
+                        joystickArea.style.width = '100px';
+                        joystickArea.style.height = '100px';
+                    } else if (screenWidth < 768) {
+                        // For phone screens
+                        joystickArea.style.bottom = '90px';
+                        joystickArea.style.left = '25px';
+                    } else {
+                        // For larger screens
+                        joystickArea.style.bottom = '100px';
+                        joystickArea.style.left = '30px';
+                    }
+                    
+                    console.log("Joystick area displayed:", joystickArea.getBoundingClientRect());
+                    
+                    if (joystickBase && joystickHandle) {
+                        // Position the joystick at the initial position
+                        const rect = joystickArea.getBoundingClientRect();
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+                        
+                        joystickBase.style.display = 'block';
+                        joystickBase.style.left = `${centerX}px`;
+                        joystickBase.style.top = `${centerY}px`;
+                        joystickBase.style.visibility = 'visible';
+                        
+                        joystickHandle.style.display = 'block';
+                        joystickHandle.style.left = `${centerX}px`;
+                        joystickHandle.style.top = `${centerY}px`;
+                        joystickHandle.style.visibility = 'visible';
+                        
+                        console.log("Joystick elements positioned and displayed");
+                    }
                 }
+                
+                // Also make sure action buttons are properly positioned
+                const actionButtons = document.getElementById('touch-action-buttons');
+                if (actionButtons) {
+                    const screenWidth = window.innerWidth;
+                    actionButtons.style.display = 'flex';
+                    actionButtons.style.visibility = 'visible';
+                    actionButtons.style.zIndex = '10000';
+                    actionButtons.style.pointerEvents = 'auto';
+                    
+                    if (screenWidth < 375) {
+                        // For very small screens
+                        actionButtons.style.bottom = '90px';
+                        actionButtons.style.right = '15px';
+                        actionButtons.style.gap = '20px';
+                    } else if (screenWidth < 768) {
+                        // For phone screens
+                        actionButtons.style.bottom = '110px';
+                        actionButtons.style.right = '25px';
+                    } else {
+                        // For larger screens
+                        actionButtons.style.bottom = '120px';
+                        actionButtons.style.right = '30px';
+                    }
+                    
+                    console.log("Action buttons container displayed");
+                }
+                
+                // Verify each button is visible and adjust size based on screen
+                const buttons = document.querySelectorAll('.touch-btn');
+                buttons.forEach((btn) => {
+                    btn.style.display = 'flex';
+                    btn.style.visibility = 'visible';
+                    btn.style.zIndex = '10001';
+                    
+                    // Adjust button size for smaller screens
+                    if (window.innerWidth < 375) {
+                        btn.style.width = '60px';
+                        btn.style.height = '60px';
+                        btn.style.fontSize = '12px';
+                    }
+                    
+                    console.log(`Button ${btn.id} display set to visible`);
+                });
+            } else {
+                console.error("Mobile controls container not found in the DOM!");
             }
             
             // Show mobile controls info
@@ -138,13 +250,24 @@ export class UIManager {
             
             // Add utility function for touch feedback
             document.querySelectorAll('.touch-btn').forEach(button => {
-                button.addEventListener('touchstart', () => {
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent default behavior
                     button.classList.add('touch-btn-active');
-                });
+                    console.log(`Button ${button.id} touched`);
+                }, { passive: false });
                 
-                button.addEventListener('touchend', () => {
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault(); // Prevent default behavior
                     button.classList.remove('touch-btn-active');
-                });
+                }, { passive: false });
+            });
+            
+            // Log button elements for debugging
+            console.log("Touch buttons initialized:");
+            const buttons = document.querySelectorAll('.touch-btn');
+            console.log(`Found ${buttons.length} touch buttons`);
+            buttons.forEach((btn, index) => {
+                console.log(`Button ${index}: ${btn.id}, visible:`, btn.style.display !== 'none');
             });
         } else {
             // Hide mobile controls on desktop

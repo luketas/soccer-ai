@@ -72,60 +72,56 @@ export class InputManager {
     
     // Handle touch start for directional joystick
     onTouchStart(event) {
-        // Only handle the first touch for joystick
-        const touch = event.touches[0];
-        const touchElement = document.elementFromPoint(touch.clientX, touch.clientY);
+        console.log("Touch start in InputManager", event.touches.length, "touches");
         
-        // Check which touch control was activated
-        if (touchElement.id === 'touch-joystick-area') {
-            this.touchJoystickActive = true;
-            this.touchJoystickCenter.set(touch.clientX, touch.clientY);
-            this.touchJoystickPosition.copy(this.touchJoystickCenter);
+        // Only handle the first touch for joystick
+        if (event.touches.length > 0) {
+            const touch = event.touches[0];
+            const touchElement = document.elementFromPoint(touch.clientX, touch.clientY);
             
-            // Update joystick UI position
-            const joystickBase = document.getElementById('touch-joystick-base');
-            const joystickHandle = document.getElementById('touch-joystick-handle');
-            if (joystickBase && joystickHandle) {
-                joystickBase.style.left = `${touch.clientX}px`;
-                joystickBase.style.top = `${touch.clientY}px`;
-                joystickBase.style.display = 'block';
-                joystickHandle.style.left = `${touch.clientX}px`;
-                joystickHandle.style.top = `${touch.clientY}px`;
-                joystickHandle.style.display = 'block';
+            console.log("Touch on element:", touchElement ? touchElement.id : "unknown");
+            
+            // Check which touch control was activated
+            if (touchElement && touchElement.id === 'touch-joystick-area' || 
+                touchElement && touchElement.id === 'touch-joystick-base' || 
+                touchElement && touchElement.id === 'touch-joystick-handle') {
+                
+                console.log("Joystick control activated");
+                this.touchJoystickActive = true;
+                this.touchJoystickCenter.set(touch.clientX, touch.clientY);
+                this.touchJoystickPosition.copy(this.touchJoystickCenter);
+                
+                // Update joystick UI position
+                const joystickBase = document.getElementById('touch-joystick-base');
+                const joystickHandle = document.getElementById('touch-joystick-handle');
+                if (joystickBase && joystickHandle) {
+                    joystickBase.style.left = `${touch.clientX}px`;
+                    joystickBase.style.top = `${touch.clientY}px`;
+                    joystickBase.style.display = 'block';
+                    joystickHandle.style.left = `${touch.clientX}px`;
+                    joystickHandle.style.top = `${touch.clientY}px`;
+                    joystickHandle.style.display = 'block';
+                    console.log("Joystick visuals updated");
+                }
+            } else if (touchElement && touchElement.id === 'touch-shoot-btn') {
+                console.log("Shoot button pressed");
+                this.keys.add('x'); // Simulate X key press
+                this.updateActionStates();
+                
+                // Add visual feedback (handled by CSS)
+            } else if (touchElement && touchElement.id === 'touch-pass-btn') {
+                console.log("Pass button pressed");
+                this.keys.add(' '); // Simulate Space key press
+                this.updateActionStates();
+                
+                // Add visual feedback (handled by CSS)
+            } else if (touchElement && touchElement.id === 'touch-switch-btn') {
+                console.log("Switch button pressed");
+                this.keys.add('q'); // Simulate Q key press
+                this.updateActionStates();
+                
+                // Add visual feedback (handled by CSS)
             }
-        } else if (touchElement.id === 'touch-shoot-btn') {
-            this.keys.add('x'); // Simulate X key press
-            this.updateActionStates();
-            
-            // Add visual feedback
-            touchElement.classList.add('touch-btn-active');
-            setTimeout(() => {
-                touchElement.classList.remove('touch-btn-active');
-                this.keys.delete('x');
-                this.updateActionStates();
-            }, 200);
-        } else if (touchElement.id === 'touch-pass-btn') {
-            this.keys.add(' '); // Simulate Space key press
-            this.updateActionStates();
-            
-            // Add visual feedback
-            touchElement.classList.add('touch-btn-active');
-            setTimeout(() => {
-                touchElement.classList.remove('touch-btn-active');
-                this.keys.delete(' ');
-                this.updateActionStates();
-            }, 200);
-        } else if (touchElement.id === 'touch-switch-btn') {
-            this.keys.add('q'); // Simulate Q key press
-            this.updateActionStates();
-            
-            // Add visual feedback
-            touchElement.classList.add('touch-btn-active');
-            setTimeout(() => {
-                touchElement.classList.remove('touch-btn-active');
-                this.keys.delete('q');
-                this.updateActionStates();
-            }, 200);
         }
     }
     
@@ -136,53 +132,56 @@ export class InputManager {
         // Find the touch that started in the joystick area
         for (let i = 0; i < event.touches.length; i++) {
             const touch = event.touches[i];
-            const touchElement = document.elementFromPoint(touch.clientX, touch.clientY);
             
-            if (touchElement && (touchElement.id === 'touch-joystick-area' || 
-                                touchElement.id === 'touch-joystick-handle' || 
-                                touchElement.id === 'touch-joystick-base')) {
-                // Update joystick position
-                this.touchJoystickPosition.set(touch.clientX, touch.clientY);
-                
-                // Calculate joystick direction and magnitude
-                const direction = new THREE.Vector2(
-                    this.touchJoystickPosition.x - this.touchJoystickCenter.x,
-                    this.touchJoystickPosition.y - this.touchJoystickCenter.y
-                );
-                
-                // Calculate distance from center
-                const distance = direction.length();
-                
-                // Normalize direction
-                if (distance > 0) {
-                    direction.normalize();
-                }
-                
-                // Create a clamped joystick position for UI
-                const maxRadius = 40; // Maximum joystick displacement radius
-                const clampedPosition = new THREE.Vector2(
-                    this.touchJoystickCenter.x + direction.x * Math.min(distance, maxRadius),
-                    this.touchJoystickCenter.y + direction.y * Math.min(distance, maxRadius)
-                );
-                
-                // Update joystick handle position in UI
-                const joystickHandle = document.getElementById('touch-joystick-handle');
-                if (joystickHandle) {
-                    joystickHandle.style.left = `${clampedPosition.x}px`;
-                    joystickHandle.style.top = `${clampedPosition.y}px`;
-                }
-                
-                // Update action states based on joystick direction
-                // Note: Y is inverted for screen coordinates
-                if (distance > this.touchJoystickThreshold) {
-                    // Invert y direction since screen coordinates are top-to-bottom
-                    this.actionStates.movement.set(direction.x, -direction.y);
-                    
-                    // Always use sprint on mobile for better experience
-                    this.actionStates.sprint = true;
-                }
-                break;
+            // Update joystick position
+            this.touchJoystickPosition.set(touch.clientX, touch.clientY);
+            
+            // Calculate joystick direction and magnitude
+            const direction = new THREE.Vector2(
+                this.touchJoystickPosition.x - this.touchJoystickCenter.x,
+                this.touchJoystickPosition.y - this.touchJoystickCenter.y
+            );
+            
+            // Calculate distance from center
+            const distance = direction.length();
+            
+            // Normalize direction
+            if (distance > 0) {
+                direction.normalize();
             }
+            
+            // Create a clamped joystick position for UI
+            const maxRadius = 50; // Maximum joystick displacement radius (increased from 40)
+            const clampedPosition = new THREE.Vector2(
+                this.touchJoystickCenter.x + direction.x * Math.min(distance, maxRadius),
+                this.touchJoystickCenter.y + direction.y * Math.min(distance, maxRadius)
+            );
+            
+            // Update joystick handle position in UI
+            const joystickHandle = document.getElementById('touch-joystick-handle');
+            if (joystickHandle) {
+                joystickHandle.style.left = `${clampedPosition.x}px`;
+                joystickHandle.style.top = `${clampedPosition.y}px`;
+            }
+            
+            // Update action states based on joystick direction
+            // Note: Y is inverted for screen coordinates
+            if (distance > this.touchJoystickThreshold) {
+                // Invert y direction since screen coordinates are top-to-bottom
+                this.actionStates.movement.set(direction.x, -direction.y);
+                
+                // Always use sprint on mobile for better experience
+                this.actionStates.sprint = true;
+                
+                // Log to confirm joystick is moving
+                if (distance > 30) {
+                    console.log("Joystick moved:", 
+                        direction.x.toFixed(2), 
+                        direction.y.toFixed(2), 
+                        "Distance:", distance.toFixed(2));
+                }
+            }
+            break;
         }
     }
     

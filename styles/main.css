@@ -47,98 +47,111 @@ body, html {
 
 /* Mobile Controls */
 #mobile-controls {
-    position: absolute;
+    position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 100%; /* Use full height of the container */
-    display: none; /* Hidden by default, shown via JS if on mobile */
-    pointer-events: none; /* Let clicks pass through the container by default */
-    z-index: 15; /* Ensure controls appear above other UI elements */
+    height: 100%;
+    display: none; /* Hidden by default until game starts */
+    z-index: 9999;
+    pointer-events: auto;
+}
+
+/* Show mobile controls automatically on touch devices */
+@media (hover: none) and (pointer: coarse) {
+    #mobile-controls {
+        display: flex !important;
+    }
 }
 
 /* Virtual joystick styling */
 #touch-joystick-area {
-    position: absolute;
-    bottom: 30px;
+    position: fixed;
+    bottom: 100px;
     left: 30px;
     width: 120px;
     height: 120px;
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 3px solid rgba(255, 255, 255, 0.9);
     border-radius: 60px;
-    pointer-events: auto !important;
+    pointer-events: auto;
+    z-index: 10000;
 }
 
 .joystick-base {
     position: absolute;
     width: 80px;
     height: 80px;
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 40px;
     transform: translate(-50%, -50%);
-    display: none;
+    display: block;
+    z-index: 10001;
 }
 
 .joystick-handle {
     position: absolute;
     width: 40px;
     height: 40px;
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 2px solid #fff;
     border-radius: 20px;
     transform: translate(-50%, -50%);
-    display: none;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    display: block;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+    z-index: 10002;
 }
 
 /* Action buttons styling */
 #touch-action-buttons {
-    position: absolute;
-    bottom: 30px;
+    position: fixed;
+    bottom: 120px;
     right: 30px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    pointer-events: auto !important;
+    gap: 25px;
+    pointer-events: auto;
+    z-index: 10000;
 }
 
 .touch-btn {
-    width: 80px;
-    height: 80px;
-    background-color: rgba(0, 102, 204, 0.7);
+    width: 70px;
+    height: 70px;
+    background-color: rgba(0, 102, 204, 0.8);
     color: white;
-    border: none;
-    border-radius: 40px;
-    font-size: 16px;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    border-radius: 35px;
+    font-size: 14px;
     font-weight: bold;
     text-transform: uppercase;
-    display: flex;
+    display: flex !important;
     justify-content: center;
     align-items: center;
-    pointer-events: auto !important;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    z-index: 10001;
 }
 
 .touch-btn-active {
-    background-color: rgba(0, 153, 255, 0.9);
+    background-color: rgba(0, 153, 255, 0.95);
     transform: scale(0.95);
 }
 
 .pause-btn {
-    position: absolute;
+    position: fixed;
     top: 20px;
     right: 20px;
-    width: 40px;
-    height: 40px;
+    width: 50px;
+    height: 50px;
     font-weight: bold;
-    background-color: rgba(255, 50, 50, 0.7);
+    background-color: rgba(255, 50, 50, 0.8);
+    z-index: 10001;
 }
 
-/* Media queries for mobile */
-.mobile-controls-info {
-    display: none;
-}
-
-@media (max-width: 768px), (any-pointer: coarse) {
+/* Media queries for mobile - ALWAYS show controls on mobile */
+@media (max-width: 1024px), (any-pointer: coarse) {
     /* Show mobile controls on touch devices */
     #mobile-controls {
         display: flex !important;
@@ -146,100 +159,7 @@ body, html {
     
     /* Show mobile controls info in the menu */
     .mobile-controls-info {
-        display: block;
-        margin-top: 10px;
-        padding-top: 10px;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    /* Adjust other UI elements for mobile */
-    #scoreboard {
-        font-size: 14px;
-        padding: 5px 10px;
-    }
-    
-    #game-time {
-        font-size: 16px;
-    }
-    
-    /* Make menu more compact for mobile */
-    .team-selection {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .menu-options {
-        max-width: 100%;
-        padding: 10px;
-    }
-    
-    #main-menu, #pause-menu, #game-over {
-        max-width: 90vw;
-        max-height: 85vh;
-        padding: 20px 15px;
-        margin: 0 15px;
-        overflow-y: auto;
-    }
-    
-    h1 {
-        font-size: 32px;
-        margin-bottom: 20px;
-    }
-    
-    h2 {
-        font-size: 24px;
-        margin-bottom: 15px;
-    }
-    
-    button {
-        padding: 10px 18px;
-        font-size: 14px;
-        margin: 8px;
-    }
-    
-    select {
-        width: 100%;
-        margin-bottom: 5px;
-    }
-    
-    .controls-info {
-        font-size: 14px;
-        padding: 10px;
-        max-width: 100%;
-    }
-    
-    /* For very small screens */
-    @media (max-width: 350px) {
-        #main-menu, #pause-menu, #game-over {
-            padding: 15px 10px;
-        }
-        
-        h1 {
-            font-size: 28px;
-            margin-bottom: 15px;
-        }
-        
-        button {
-            padding: 8px 15px;
-            font-size: 12px;
-            margin: 6px;
-        }
-    }
-    
-    /* Adjust joystick and buttons size for smaller screens */
-    @media (max-height: 500px) {
-        #touch-joystick-area {
-            width: 100px;
-            height: 100px;
-            border-radius: 50px;
-        }
-        
-        .touch-btn {
-            width: 60px;
-            height: 60px;
-            border-radius: 30px;
-            font-size: 12px;
-        }
+        display: block !important;
     }
 }
 
