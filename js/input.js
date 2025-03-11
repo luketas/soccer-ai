@@ -151,7 +151,7 @@ export class InputManager {
             }
             
             // Create a clamped joystick position for UI
-            const maxRadius = 50; // Maximum joystick displacement radius (increased from 40)
+            const maxRadius = 50; // Maximum joystick displacement radius
             const clampedPosition = new THREE.Vector2(
                 this.touchJoystickCenter.x + direction.x * Math.min(distance, maxRadius),
                 this.touchJoystickCenter.y + direction.y * Math.min(distance, maxRadius)
@@ -166,19 +166,20 @@ export class InputManager {
             
             // Update action states based on joystick direction
             if (distance > this.touchJoystickThreshold) {
-                // Fix the inverted joystick by using the correct direction
-                // Don't negate the y-direction anymore
+                // FIXED: Do NOT invert the Y direction to fix the inverted movement issue
+                // Screen coordinates are Y-down, but we want joystick up to move player up
                 this.actionStates.movement.set(direction.x, direction.y);
                 
                 // Always use sprint on mobile for better experience
                 this.actionStates.sprint = true;
                 
-                // Log to confirm joystick is moving
+                // Log to confirm joystick is moving with correct orientation
                 if (distance > 30) {
                     console.log("Joystick moved:", 
                         direction.x.toFixed(2), 
                         direction.y.toFixed(2), 
-                        "Distance:", distance.toFixed(2));
+                        "Distance:", distance.toFixed(2),
+                        "Movement:", this.actionStates.movement.x.toFixed(2), this.actionStates.movement.y.toFixed(2));
                 }
             }
             break;
